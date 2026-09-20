@@ -1,0 +1,18 @@
+{
+  "name": "sigil-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "description": "Time-locked, threshold-controlled custody of examination papers on a blockchain ledger",
+  "scripts": {
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "coverage": "pnpm --filter @sigil/contracts coverage",
+    "coverage:check": "pnpm --filter @sigil/contracts coverage:check",
+    "docs:contract": "pnpm --filter @sigil/contracts docs:contract",
+    "test:contracts": "pnpm --filter @sigil/contracts test",
+    "coverage:contracts": "pnpm --filter @sigil/contracts coverage",
+    "lint:contracts": "pnpm --filter @sigil/contracts lint"
+  }
+}

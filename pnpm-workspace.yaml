@@ -1,0 +1,9 @@
+packages:
+  - 'contracts'
+  - 'packages/*'
+  - 'backend'
+  - 'frontend'
+
+allowBuilds:
+  keccak: true
+  secp256k1: true

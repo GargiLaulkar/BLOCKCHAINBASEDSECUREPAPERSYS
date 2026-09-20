@@ -1,0 +1,20 @@
+{
+  "name": "@sigil/contracts-types",
+  "version": "1.0.0",
+  "description": "Generated TypeChain typings and ABI for SIGIL ExamVault smart contracts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "abi"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
