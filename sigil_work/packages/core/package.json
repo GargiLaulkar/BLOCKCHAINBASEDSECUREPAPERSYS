@@ -1,0 +1,87 @@
+{
+  "name": "@sigil/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SIGIL shared cryptography, paper selection, variant generation and leak-matching package. The only place with crypto/selection/matching logic; imported by frontend, backend and contract tests (docs/SIGIL_Master_Project_Document.md section 9).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./canonical": {
+      "types": "./dist/canonical.d.ts",
+      "import": "./dist/canonical.js"
+    },
+    "./envelope": {
+      "types": "./dist/envelope.d.ts",
+      "import": "./dist/envelope.js"
+    },
+    "./ceremony": {
+      "types": "./dist/ceremony.d.ts",
+      "import": "./dist/ceremony.js"
+    },
+    "./shares": {
+      "types": "./dist/shares.d.ts",
+      "import": "./dist/shares.js"
+    },
+    "./keystore": {
+      "types": "./dist/keystore.d.ts",
+      "import": "./dist/keystore.js"
+    },
+    "./batch": {
+      "types": "./dist/batch.d.ts",
+      "import": "./dist/batch.js"
+    },
+    "./paper": {
+      "types": "./dist/paper.d.ts",
+      "import": "./dist/paper.js"
+    },
+    "./matcher": {
+      "types": "./dist/matcher.d.ts",
+      "import": "./dist/matcher.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas.d.ts",
+      "import": "./dist/schemas.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./package.json": "./package.json",
+    "./draft": {
+      "types": "./dist/draft.d.ts",
+      "import": "./dist/draft.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify:browser": "node scripts/check-browser-bundle.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  },
+  "dependencies": {
+    "canonicalize": "^2.1.0",
+    "ethers": "^6.15.0",
+    "shamir-secret-sharing": "^0.0.4",
+    "zod": "^4.1.0"
+  }
+}
