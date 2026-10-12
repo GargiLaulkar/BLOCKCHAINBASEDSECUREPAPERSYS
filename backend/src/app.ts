@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import { createHealthRouter } from "./routes/health.js";
 import { createAuthRouter } from "./routes/auth.js";
+import { createExamsRouter } from "./routes/exams.js";
 import type { Config } from "./config.js";
 import type { Provider, Contract } from "ethers";
 
@@ -41,6 +42,7 @@ export function createApp(
   // Mount endpoints
   app.use("/api", createHealthRouter(() => cfg, customProvider));
   app.use("/api/auth", createAuthRouter(() => cfg, customContract));
+  app.use("/api/exams", createExamsRouter(() => cfg, customContract));
 
   // 404 Handler
   app.use((_req, res) => {
