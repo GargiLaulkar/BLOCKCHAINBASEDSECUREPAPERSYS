@@ -1,11 +1,18 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import session from "express-session";
 import { createHealthRouter } from "./routes/health.js";
+import { createAuthRouter } from "./routes/auth.js";
 import type { Config } from "./config.js";
-import type { Provider } from "ethers";
+import type { Provider, Contract } from "ethers";
 
-export function createApp(cfg: Config, customProvider?: Provider) {
+export function createApp(
+  cfg: Config,
+  customProvider?: Provider,
+  customContract?: Contract
+) {
   const app = express();
 
   app.use(helmet());
@@ -16,9 +23,24 @@ export function createApp(cfg: Config, customProvider?: Provider) {
     })
   );
   app.use(express.json());
+  app.use(cookieParser());
+  app.use(
+    session({
+      secret: cfg.SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: cfg.NODE_ENV === "production",
+        maxAge: 24 * 60 * 60 * 1000,
+      },
+    })
+  );
 
-  // Mount health endpoint
+  // Mount endpoints
   app.use("/api", createHealthRouter(() => cfg, customProvider));
+  app.use("/api/auth", createAuthRouter(() => cfg, customContract));
 
   // 404 Handler
   app.use((_req, res) => {

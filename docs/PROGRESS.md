@@ -38,7 +38,7 @@
 |---|---|---|---|
 | BE-01 | Scaffold Express, config validation, Docker Compose for PostgreSQL | Completed | Config validation & /api/health tests passing |
 | BE-02 | Prisma schema and migrations (section 8.3) | Completed | Schema & initial SQL migration created |
-| BE-03 | SIWE authentication, session, chain-derived roles | Not Started | EIP-4361 |
+| BE-03 | SIWE authentication, session, chain-derived roles | Completed | EIP-4361, nonce replay & domain checks tested |
 | BE-04 | Exam metadata endpoints with hash verification | Not Started | Canonical hash check |
 | BE-05 | Batch upload, confirmation, gated download | Not Started | Multipart upload & gating |
 | BE-06 | Encrypted share endpoints | Not Started | Holder-restricted access |
