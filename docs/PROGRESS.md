@@ -42,7 +42,7 @@
 | BE-04 | Exam metadata endpoints with hash verification | Completed | Canonical hash check & role verification passing |
 | BE-05 | Batch upload, confirmation, gated download | Not Started | Multipart upload & gating |
 | BE-06 | Encrypted share endpoints | Not Started | Holder-restricted access |
-| BE-07 | Indexer (backfill, live, idempotent, resumable) | Not Started | EVM event log sync |
+| BE-07 | Indexer (backfill, live, idempotent, resumable) | Completed | Section 7.3 event decoder, idempotent derived table mutations, resumable state, 24h unconfirmed batch purge |
 | BE-08 | Events and stats endpoints with pagination and filters | Not Started | Event log API |
 | BE-09 | Audit trace endpoints | Not Started | Auditor leak traces |
 | BE-10 | Security middleware, logging, uniform errors, rate limits | Not Started | Helmet, pino, rate limits |
