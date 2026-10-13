@@ -83,13 +83,14 @@ corepack pnpm demo:reset
 - `DATABASE_URL` detection: absent in the environment and backend/.env. PostgreSQL TCP check: `127.0.0.1:5432` unavailable. Docker CLI: unavailable.
 - Prisma migration attempt failed with Prisma `P1012`: `Environment variable not found: DATABASE_URL.`
 - `corepack pnpm demo:reset` failed safely: `Refusing to reset: DATABASE_URL must be configured in the environment or backend/.env and point to a local PostgreSQL database.`
+- Remote-host guard check failed safely before contacting any database or chain: `Refusing to reset a non-local database host: db.example.invalid.`
 - `corepack pnpm dev:all` started a local chain and deployed `ExamVault`, selected Docker fallback, then failed: `'docker' is not recognized as an internal or external command`; API/web were not started.
 - `GET http://127.0.0.1:4000/api/health` failed: `Unable to connect to the remote server`.
 - `corepack pnpm --filter @sigil/backend typecheck`: passed.
 - `corepack pnpm --filter @sigil/backend lint`: passed.
 - `corepack pnpm lint`: passed; existing Solhint warning `Contract has 22 states declarations but allowed no more than 15`.
 - `corepack pnpm --filter @sigil/backend test`: passed, 52 passed; authorization matrix and opt-in process test skipped in that run.
-- `corepack pnpm --filter @sigil/backend test:indexer-process`: passed, 1 test.
+- `node scripts/test-indexer-process.mjs`: passed, 1 test.
 - `corepack pnpm test:auth-matrix`: passed, 295 tests.
 
 ## Open questions
