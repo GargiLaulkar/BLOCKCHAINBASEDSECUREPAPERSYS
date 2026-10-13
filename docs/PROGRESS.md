@@ -45,7 +45,7 @@
 | BE-07 | Indexer (backfill, live, idempotent, resumable) | Completed | Section 7.3 event decoder, idempotent derived table mutations, resumable state, 24h unconfirmed batch purge |
 | BE-08 | Events and stats endpoints with pagination and filters | Completed | Public filtered event feed with stable cursor paging; authenticated indexed overview and readiness schemas; server-side share verification explicitly omitted |
 | BE-09 | Audit trace endpoints | Completed | Auditor-only traces validate MatchReport JSON, verify canonical Keccak evidence hashes, recheck the chain role, and restrict reads to the owner |
-| BE-10 | Security middleware, logging, uniform errors, rate limits | Not Started | Helmet, pino, rate limits |
-| BE-11 | OpenAPI document and generated frontend types | Not Started | OpenAPI spec |
+| BE-10 | Security middleware, logging, uniform errors, rate limits | Completed | Strict frontend-origin CORS, Helmet, Zod request validation, differentiated auth/upload limits, sensitive-field redaction, section 11 checks; profiles hash `keccakJson({displayName, organisation})` using core RFC 8785 canonicalization |
+| BE-11 | OpenAPI document and generated frontend types | Completed | Zod-derived OpenAPI 3.1, generated frontend types, and CI drift check in place |
 | BE-12 | Authorisation matrix test suite | Not Started | Role matrix coverage |
 | BE-13 | `dev:all` and `demo:reset` scripts | Not Started | Developer tooling & scripts |

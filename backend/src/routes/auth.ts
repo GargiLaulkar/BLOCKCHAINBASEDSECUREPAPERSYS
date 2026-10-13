@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { generateNonce, SiweMessage } from "siwe";
 import { ethers } from "ethers";
-import { z } from "zod";
+import { schemas } from "@sigil/core";
 import type { Config } from "../config.js";
 import { getRolesForAddress } from "../services/roles.js";
 
@@ -12,11 +12,6 @@ declare module "express-session" {
     roles?: string[];
   }
 }
-
-const verifyBodySchema = z.object({
-  message: z.string().min(1, "message is required"),
-  signature: z.string().min(1, "signature is required"),
-});
 
 export function createAuthRouter(
   getConfigFn: () => Config,
@@ -35,14 +30,14 @@ export function createAuthRouter(
   router.post("/verify", async (req: Request, res: Response) => {
     try {
       const cfg = getConfigFn();
-      const parseResult = verifyBodySchema.safeParse(req.body);
+      const parseResult = schemas.AuthVerifyPayloadSchema.safeParse(req.body);
 
       if (!parseResult.success) {
         return res.status(400).json({
           error: {
             code: "BAD_REQUEST",
             message: "Invalid request payload",
-            details: parseResult.error.errors,
+            details: parseResult.error.issues,
           },
         });
       }

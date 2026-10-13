@@ -136,7 +136,7 @@ describe("Auditor leak trace endpoints (BE-09)", () => {
 
     const badHash = await auditorAgent.post("/api/audit/traces").send({
       examId: "7",
-      evidenceHash: `0x${"00".repeat(32)}`,
+      evidenceHash: ethers.keccak256(ethers.toUtf8Bytes("different evidence")),
       result: report,
     });
     expect(badHash.status).toBe(400);

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { ethers } from "ethers";
+import { z } from "zod";
 import { ExamVaultABI } from "@sigil/contracts-types";
 import { canonical, schemas } from "@sigil/core";
 import { requireAuth, requireRole } from "../middleware/auth.js";
@@ -11,6 +12,15 @@ export function createAuditRouter(
   customContract?: ethers.Contract
 ) {
   const router = Router();
+  router.param("id", (req, res, next, value) => {
+    const parsed = z.string().min(1).max(128).safeParse(value);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: { code: "INVALID_TRACE_ID", message: "Trace id is invalid" },
+      });
+    }
+    next();
+  });
 
   function getContract() {
     if (customContract) return customContract;

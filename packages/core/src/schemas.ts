@@ -1,16 +1,29 @@
 import { z } from "zod";
+import { getAddress } from "ethers";
 
-const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
-const hex32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
+const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).refine((value) => {
+  try {
+    return value === getAddress(value) && value !== "0x0000000000000000000000000000000000000000";
+  } catch {
+    return false;
+  }
+}, "Address must be checksummed and non-zero");
+const hex32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/).refine((value) => !/^0x0{64}$/i.test(value), "Hash must not be zero");
+const safeText = (value: string) => !/[\u0000-\u001f\u007f]/.test(value);
 
 export const QuestionSchema = z.object({
-  text: z.string().min(10).max(2000),
-  options: z.tuple([z.string().min(1).max(500), z.string().min(1).max(500), z.string().min(1).max(500), z.string().min(1).max(500)]).superRefine((options, ctx) => {
+  text: z.string().min(10).max(2000).refine(safeText, "Control characters are not allowed"),
+  options: z.tuple([
+    z.string().min(1).max(500).refine(safeText, "Control characters are not allowed"),
+    z.string().min(1).max(500).refine(safeText, "Control characters are not allowed"),
+    z.string().min(1).max(500).refine(safeText, "Control characters are not allowed"),
+    z.string().min(1).max(500).refine(safeText, "Control characters are not allowed"),
+  ]).superRefine((options, ctx) => {
     const trimmed = options.map((x) => x.trim());
     if (new Set(trimmed).size !== 4) ctx.addIssue({ code: "custom", message: "Options must be unique" });
   }),
   correctIndex: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
-  explanation: z.string().max(2000).optional()
+  explanation: z.string().max(2000).refine(safeText, "Control characters are not allowed").optional()
 });
 
 export const BatchPlainSchema = z.object({
@@ -27,6 +40,17 @@ export const ExamMetaSchema = z.object({
   releaseOpensAt: z.number().int().nonnegative(),
   examStartsAt: z.number().int().nonnegative(),
   examEndsAt: z.number().int().nonnegative()
+}).superRefine((meta, ctx) => {
+  const names = meta.sections.map((section) => section.name);
+  if (new Set(names).size !== names.length) {
+    ctx.addIssue({ code: "custom", path: ["sections"], message: "Section names must be unique" });
+  }
+  if (!(meta.releaseOpensAt < meta.examStartsAt && meta.examStartsAt < meta.examEndsAt)) {
+    ctx.addIssue({ code: "custom", path: ["releaseOpensAt"], message: "Exam times must be strictly ordered" });
+  }
+  if (meta.examStartsAt - meta.releaseOpensAt > 6 * 60 * 60) {
+    ctx.addIssue({ code: "custom", path: ["releaseOpensAt"], message: "Release window must be no more than six hours" });
+  }
 });
 
 export const VariantItemSchema = z.object({
@@ -45,7 +69,36 @@ export const VariantSchema = z.object({
 
 export const HashSchema = hex32;
 export const AddressSchema = address;
+export const ChecksummedAddressSchema = address;
 export const APIErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string(), details: z.unknown().optional() }) });
+export const ProfilePayloadSchema = z.object({
+  displayName: z.string().trim().min(1).max(120),
+  organisation: z.string().trim().min(1).max(200),
+});
+export const ProfileResponseSchema = z.object({
+  address: ChecksummedAddressSchema,
+  displayName: z.string().nullable(),
+  organisation: z.string().nullable(),
+  profileHash: hex32.nullable(),
+});
+export const AuthVerifyPayloadSchema = z.object({
+  message: z.string().min(1),
+  signature: z.string().min(1),
+});
+export const NonceResponseSchema = z.object({ nonce: z.string().min(1) });
+export const AuthResponseSchema = z.object({
+  address: ChecksummedAddressSchema,
+  roles: z.array(z.string()),
+});
+export const EventsQuerySchema = z.object({
+  exam: z.string().regex(/^\d+$/).optional(),
+  type: z.string().min(1).max(100).optional(),
+  actor: ChecksummedAddressSchema.optional(),
+  from: z.string().min(1).optional(),
+  to: z.string().min(1).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  cursor: z.string().min(1).optional(),
+});
 
 export const MatchReportSchema = z.object({
   matches: z.array(z.object({
@@ -116,7 +169,31 @@ export const ExamReadinessResponseSchema = z.object({
   notTrackedByServer: z.array(z.literal("shareVerified"))
 });
 
-export const CreateExamPayloadSchema = z.object({ metaHash: hex32, releaseOpensAt: z.number().int(), examStartsAt: z.number().int(), examEndsAt: z.number().int(), threshold: z.number().int().min(2), holders: z.array(address), setters: z.array(address), centres: z.array(address), quotas: z.array(z.number().int().min(1).max(500)).min(1).max(8) });
+export const CreateExamPayloadSchema = z.object({
+  metaHash: hex32,
+  releaseOpensAt: z.number().int().nonnegative(),
+  examStartsAt: z.number().int().nonnegative(),
+  examEndsAt: z.number().int().nonnegative(),
+  threshold: z.number().int().min(2),
+  holders: z.array(address).min(3).max(20),
+  setters: z.array(address).min(1),
+  centres: z.array(address).min(1),
+  quotas: z.array(z.number().int().min(1).max(500)).min(1).max(8)
+}).superRefine((exam, ctx) => {
+  if (exam.threshold <= exam.holders.length / 2 || exam.threshold > exam.holders.length) {
+    ctx.addIssue({ code: "custom", path: ["threshold"], message: "Threshold must be greater than half the holders and at most their count" });
+  }
+  const panel = [...exam.holders, ...exam.setters, ...exam.centres];
+  if (new Set(panel).size !== panel.length) {
+    ctx.addIssue({ code: "custom", path: ["holders"], message: "Panel addresses must not be duplicated" });
+  }
+  if (!(exam.releaseOpensAt < exam.examStartsAt && exam.examStartsAt < exam.examEndsAt)) {
+    ctx.addIssue({ code: "custom", path: ["releaseOpensAt"], message: "Exam times must be strictly ordered" });
+  }
+  if (exam.examStartsAt - exam.releaseOpensAt > 6 * 60 * 60) {
+    ctx.addIssue({ code: "custom", path: ["releaseOpensAt"], message: "Release window must be no more than six hours" });
+  }
+});
 export const BatchUploadPayloadSchema = z.object({ examId: z.string(), sectionId: z.number().int(), ciphertextHash: hex32, questionCount: z.number().int().min(1).max(500) });
 export const LeakTracePayloadSchema = z.object({ examId: z.string().regex(/^\d+$/), evidenceHash: hex32, result: MatchReportSchema });
 

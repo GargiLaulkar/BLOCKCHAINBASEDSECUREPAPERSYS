@@ -38,6 +38,15 @@ jobs:
           pnpm --filter @sigil/contracts lint
           pnpm -r --if-present lint
 
+      - name: Build shared schemas and verify OpenAPI contract
+        run: |
+          pnpm --filter @sigil/core build
+          pnpm --filter @sigil/backend openapi:generate
+          git diff --exit-code -- docs/api/openapi.json frontend/src/api/generated.ts
+
+      - name: Typecheck generated frontend API types
+        run: pnpm --filter @sigil/backend exec -- tsc -p ../frontend/tsconfig.json
+
       - name: Run Typechecks
         run: |
           pnpm --filter @sigil/contracts typecheck

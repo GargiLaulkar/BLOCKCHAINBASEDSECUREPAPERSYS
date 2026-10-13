@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { z } from "zod";
 import { schemas } from "@sigil/core";
 import { requireAuth } from "../middleware/auth.js";
 import { prisma } from "../db.js";
@@ -12,6 +13,15 @@ function emptyCounts<T extends readonly string[]>(keys: T): Record<T[number], nu
 
 export function createStatsRouter() {
   const router = Router();
+  router.param("id", (req, res, next, value) => {
+    const parsed = z.string().regex(/^\d+$/).safeParse(value);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: { code: "INVALID_EXAM_ID", message: "Exam id must be a non-negative integer" },
+      });
+    }
+    next();
+  });
 
   router.get("/stats/overview", requireAuth, async (_req: Request, res: Response) => {
     try {

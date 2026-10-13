@@ -4,6 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { Router, Request, Response } from "express";
 import { ethers } from "ethers";
+import { z } from "zod";
 import multer from "multer";
 import { ExamVaultABI } from "@sigil/contracts-types";
 import { canonical, schemas } from "@sigil/core";
@@ -78,6 +79,24 @@ export function createExamsRouter(
   customContract?: ethers.Contract
 ) {
   const router = Router();
+  router.param("id", (req, res, next, value) => {
+    const parsed = z.string().regex(/^\d+$/).safeParse(value);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: { code: "INVALID_EXAM_ID", message: "Exam id must be a non-negative integer" },
+      });
+    }
+    next();
+  });
+  router.param("batchId", (req, res, next, value) => {
+    const parsed = z.string().min(1).max(128).safeParse(value);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: { code: "INVALID_BATCH_ID", message: "Batch id is invalid" },
+      });
+    }
+    next();
+  });
   const batchUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: MAX_BATCH_BYTES, files: 1 },
@@ -151,24 +170,22 @@ export function createExamsRouter(
           });
         }
 
-        const sectionText = req.body.sectionId;
-        const questionCountText = req.body.questionCount;
-        if (
-          typeof sectionText !== "string" ||
-          !/^\d+$/.test(sectionText) ||
-          typeof questionCountText !== "string" ||
-          !/^\d+$/.test(questionCountText)
-        ) {
+        const fields = z.object({
+          sectionId: z.string().regex(/^\d+$/),
+          questionCount: z.string().regex(/^\d+$/),
+        }).safeParse(req.body);
+        if (!fields.success) {
           return res.status(400).json({
             error: {
               code: "VALIDATION_FAILED",
               message: "Multipart fields sectionId and questionCount are required integers",
+              details: fields.error.issues,
             },
           });
         }
 
-        const sectionId = Number(sectionText);
-        const questionCount = Number(questionCountText);
+        const sectionId = Number(fields.data.sectionId);
+        const questionCount = Number(fields.data.questionCount);
         if (
           !Number.isSafeInteger(sectionId) ||
           sectionId > 255 ||
@@ -649,13 +666,30 @@ export function createExamsRouter(
             },
           });
         }
+        const sharesPayload = z.array(z.object({
+          holder: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+          envelope: z.union([
+            z.string().min(1),
+            z.instanceof(Uint8Array),
+            z.array(z.number().int().min(0).max(255)),
+          ]),
+        })).safeParse(rawShares);
+        if (!sharesPayload.success) {
+          return res.status(400).json({
+            error: {
+              code: "VALIDATION_FAILED",
+              message: "Invalid encrypted share entries",
+              details: sharesPayload.error.issues,
+            },
+          });
+        }
 
         // Check holder count
-        if (rawShares.length !== panelHolders.length) {
+        if (sharesPayload.data.length !== panelHolders.length) {
           return res.status(400).json({
             error: {
               code: "INVALID_HOLDER_COUNT",
-              message: `Expected exactly ${panelHolders.length} shares for panel holders, got ${rawShares.length}`,
+              message: `Expected exactly ${panelHolders.length} shares for panel holders, got ${sharesPayload.data.length}`,
             },
           });
         }
@@ -663,7 +697,7 @@ export function createExamsRouter(
         const seenHolders = new Set<string>();
         const parsedShares: Array<{ holder: string; envelopeBytes: Buffer }> = [];
 
-        for (const item of rawShares) {
+        for (const item of sharesPayload.data) {
           if (!item.holder || !item.envelope) {
             return res.status(400).json({
               error: {

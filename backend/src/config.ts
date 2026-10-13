@@ -37,7 +37,7 @@ export type Config = z.infer<typeof configSchema>;
 export function parseConfig(envInput: Record<string, string | undefined>): Config {
   const result = configSchema.safeParse(envInput);
   if (!result.success) {
-    const formattedErrors = result.error.errors
+    const formattedErrors = result.error.issues
       .map((err) => `  - ${err.path.join(".")}: ${err.message}`)
       .join("\n");
     const errorMsg = `\n=========================================\n❌ FATAL: Configuration Validation Failed\n=========================================\n${formattedErrors}\n=========================================\n`;

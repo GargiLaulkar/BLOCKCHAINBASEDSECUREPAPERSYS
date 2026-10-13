@@ -11,10 +11,6 @@ interface EventCursor {
   logIndex: number;
 }
 
-function queryString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
 function parseTimestamp(value: string): bigint | null {
   if (/^\d+$/.test(value)) return BigInt(value);
   const date = new Date(value);
@@ -54,13 +50,20 @@ export function createEventsRouter() {
   const router = Router();
 
   router.get("/events", async (req: Request, res: Response) => {
-    const examId = queryString(req.query.exam);
-    const type = queryString(req.query.type);
-    const actorInput = queryString(req.query.actor);
-    const fromInput = queryString(req.query.from);
-    const toInput = queryString(req.query.to);
-    const limitInput = queryString(req.query.limit);
-    const cursorInput = queryString(req.query.cursor);
+    const parsedQuery = schemas.EventsQuerySchema.strict().safeParse(req.query);
+    if (!parsedQuery.success) {
+      return res.status(400).json({
+        error: { code: "INVALID_FILTER", message: "Invalid event query parameters", details: parsedQuery.error.issues },
+      });
+    }
+    const query = parsedQuery.data;
+    const examId = query.exam;
+    const type = query.type;
+    const actorInput = query.actor;
+    const fromInput = query.from;
+    const toInput = query.to;
+    const limitInput = query.limit;
+    const cursorInput = query.cursor;
     if (
       ["exam", "type", "actor", "from", "to", "limit", "cursor"].some(
         (key) => req.query[key] !== undefined && typeof req.query[key] !== "string"
