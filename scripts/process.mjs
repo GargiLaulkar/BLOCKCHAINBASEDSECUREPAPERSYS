@@ -2,11 +2,26 @@ import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 
 export const ROOT = fileURLToPath(new URL("../", import.meta.url));
 export const BACKEND = fileURLToPath(new URL("../backend/", import.meta.url));
 export const CONTRACTS = fileURLToPath(new URL("../contracts/", import.meta.url));
+
+const require = createRequire(resolve(BACKEND, "package.json"));
+const dotenv = require("dotenv");
+
+export function loadBackendEnv() {
+  const result = dotenv.config({
+    path: resolve(BACKEND, ".env"),
+    override: false,
+  });
+  if (result.error && result.error.code !== "ENOENT") {
+    throw new Error(`Could not load backend/.env: ${result.error.message}`);
+  }
+  return process.env;
+}
 
 let shimDirectory;
 if (process.platform === "win32") {
@@ -37,6 +52,22 @@ export function runPnpm(args, options = {}) {
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (code === 0) resolve();
+      else reject(new Error(`pnpm ${args.join(" ")} exited with ${signal || code}`));
+    });
+  });
+}
+
+export function runPnpmCapture(args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = startPnpm(args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      ...options,
+    });
+    const stdout = [];
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code === 0) resolve(Buffer.concat(stdout).toString("utf8"));
       else reject(new Error(`pnpm ${args.join(" ")} exited with ${signal || code}`));
     });
   });

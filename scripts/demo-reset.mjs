@@ -1,26 +1,12 @@
-import { access, mkdir, readFile, rm } from "node:fs/promises";
+import { access, mkdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, parse, relative, resolve, sep } from "node:path";
-import { BACKEND, CONTRACTS, ROOT, runPnpm } from "./process.mjs";
-
-const envPath = resolve(BACKEND, ".env");
-
-function readEnvValue(envText, key) {
-  const line = envText.split(/\r?\n/).find((item) => item.trim().startsWith(`${key}=`));
-  if (!line) return undefined;
-  const value = line.slice(line.indexOf("=") + 1).trim();
-  return value.replace(/^(['"])(.*)\1$/, "$2");
-}
+import { BACKEND, CONTRACTS, ROOT, loadBackendEnv, runPnpm } from "./process.mjs";
 
 async function main() {
-  let envText = "";
-  try {
-    envText = await readFile(envPath, "utf8");
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
-  const rpcUrl = process.env.RPC_URL || readEnvValue(envText, "RPC_URL") || "http://127.0.0.1:8545";
-  const blobSetting = process.env.BLOB_DIR || readEnvValue(envText, "BLOB_DIR") || "./uploads";
+  loadBackendEnv();
+  const rpcUrl = process.env.RPC_URL || "http://127.0.0.1:8545";
+  const blobSetting = process.env.BLOB_DIR || "./uploads";
   const blobPath = resolve(BACKEND, blobSetting);
   const relativeToBackend = relative(BACKEND, blobPath);
   const forbiddenRoots = [parse(blobPath).root, resolve(ROOT), resolve(BACKEND), resolve(homedir())];
@@ -31,6 +17,20 @@ async function main() {
     relativeToBackend.startsWith(`..${sep}`)
   ) {
     throw new Error(`Refusing to wipe unsafe BLOB_DIR path: ${blobPath}. Configure a directory inside backend/ for demo reset.`);
+  }
+
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("Refusing to reset: DATABASE_URL must be configured in the environment or backend/.env and point to a local PostgreSQL database.");
+  }
+  let database;
+  try {
+    database = new URL(databaseUrl);
+  } catch {
+    throw new Error("Refusing to reset: DATABASE_URL is not a valid database URL (credential details withheld).");
+  }
+  if (!["localhost", "127.0.0.1"].includes(database.hostname)) {
+    throw new Error(`Refusing to reset a non-local database host: ${database.hostname}.`);
   }
 
   const rpc = new URL(rpcUrl);
@@ -48,6 +48,11 @@ async function main() {
     throw new Error(`Refusing to reset RPC that is not a local Hardhat chain with ID 31337: ${rpcUrl}`);
   }
 
+  await runPnpm(
+    ["--filter", "@sigil/backend", "exec", "prisma", "migrate", "reset", "--force", "--skip-seed", "--schema", "prisma/schema.prisma"],
+    { cwd: BACKEND }
+  );
+
   const rpcResponse = await fetch(rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -57,11 +62,6 @@ async function main() {
   if (!rpcResponse.ok) throw new Error(`Local chain reset failed with HTTP ${rpcResponse.status}`);
   const rpcResult = await rpcResponse.json();
   if (rpcResult.error) throw new Error(`Local chain reset failed: ${rpcResult.error.message}`);
-
-  await runPnpm(
-    ["--filter", "@sigil/backend", "exec", "prisma", "migrate", "reset", "--force", "--skip-seed", "--schema", "prisma/schema.prisma"],
-    { cwd: BACKEND }
-  );
 
   try {
     await access(blobPath);

@@ -1,6 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { BACKEND, CONTRACTS, runPnpm, startPnpm, stopChild, waitForHttp, waitForRpc } from "./process.mjs";
+import {
+  BACKEND,
+  CONTRACTS,
+  loadBackendEnv,
+  runPnpm,
+  runPnpmCapture,
+  startPnpm,
+  stopChild,
+  waitForHttp,
+  waitForRpc,
+} from "./process.mjs";
 
 const rpcUrl = process.env.RPC_URL || "http://127.0.0.1:8545";
 const children = [];
@@ -17,6 +27,7 @@ process.once("SIGINT", () => cleanup(130));
 process.once("SIGTERM", () => cleanup(143));
 
 async function main() {
+  loadBackendEnv();
   let chainIsReady = false;
   try {
     await waitForRpc(rpcUrl, null, 1500);
@@ -58,10 +69,41 @@ async function main() {
     deployment = JSON.parse(await readFile(deploymentPath, "utf8"));
   }
 
-  try {
-    await runPnpm(["exec", "docker", "compose", "up", "-d", "--wait", "postgres"]);
-  } catch (error) {
-    throw new Error(`Could not start PostgreSQL. Install and start Docker Desktop, then retry. ${error.message}`);
+  if (process.env.DATABASE_URL) {
+    console.log("Using PostgreSQL configured by DATABASE_URL; skipping Docker Compose.");
+  } else {
+    console.log("DATABASE_URL is not configured; starting PostgreSQL with Docker Compose.");
+    try {
+      await runPnpm(["exec", "docker", "compose", "up", "-d", "--wait", "postgres"]);
+      const composeOutput = await runPnpmCapture([
+        "exec",
+        "docker",
+        "compose",
+        "config",
+        "--format",
+        "json",
+      ]);
+      const composeConfig = JSON.parse(composeOutput);
+      const databaseConfig = composeConfig.services?.postgres;
+      const databaseEnv = databaseConfig?.environment;
+      if (!databaseEnv?.POSTGRES_USER || !databaseEnv.POSTGRES_PASSWORD || !databaseEnv.POSTGRES_DB) {
+        throw new Error("PostgreSQL service must define POSTGRES_USER, POSTGRES_PASSWORD and POSTGRES_DB.");
+      }
+      const databasePort = databaseConfig.ports?.find((port) => Number(port.target) === 5432)?.published;
+      if (!databasePort) {
+        throw new Error("PostgreSQL service must publish port 5432 to the host.");
+      }
+      const databaseUrl = new URL("postgresql://localhost");
+      databaseUrl.username = databaseEnv.POSTGRES_USER;
+      databaseUrl.password = databaseEnv.POSTGRES_PASSWORD;
+      databaseUrl.port = String(databasePort);
+      databaseUrl.pathname = `/${databaseEnv.POSTGRES_DB}`;
+      databaseUrl.searchParams.set("schema", "public");
+      process.env.DATABASE_URL = databaseUrl.toString();
+      console.log("Using the PostgreSQL database started by Docker Compose.");
+    } catch (error) {
+      throw new Error(`Could not start/configure PostgreSQL. Set DATABASE_URL for an existing database or install and start Docker Desktop. ${error.message}`);
+    }
   }
   process.env.RPC_URL = rpcUrl;
   process.env.CHAIN_ID = String(deployment.chainId);
