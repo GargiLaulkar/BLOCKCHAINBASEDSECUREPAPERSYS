@@ -17,7 +17,7 @@ vi.mock("../src/db.js", () => ({
       count: vi.fn().mockResolvedValue(7),
       findMany: vi.fn().mockImplementation(async (query: any) => {
         if (query.select) return indexedEvents;
-        let rows = indexedEvents.filter((event) => {
+        const rows = indexedEvents.filter((event) => {
           const where = query.where || {};
           if (where.examId !== undefined && event.examId !== where.examId) return false;
           if (where.type !== undefined && typeof where.type === "string" && event.type !== where.type) return false;

@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import type { Provider, Log } from "ethers";
+import type { Provider } from "ethers";
 import { ExamVaultABI } from "@sigil/contracts-types";
 import { logger } from "../logger.js";
 import { IndexerStateManager } from "./state.js";

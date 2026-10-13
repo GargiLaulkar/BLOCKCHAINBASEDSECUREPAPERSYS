@@ -298,7 +298,7 @@ export function createExamsRouter(
           questionCount: batch.questionCount,
           status: batch.status,
         });
-      } catch (err: unknown) {
+      } catch {
         if (savedPath) {
           try {
             await unlink(savedPath);
