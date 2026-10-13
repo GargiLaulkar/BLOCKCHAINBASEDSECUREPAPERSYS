@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:authorization-matrix": "vitest run test/authorization-matrix.test.ts",
     "openapi:generate": "tsx scripts/generate-openapi.ts && openapi-typescript ../docs/api/openapi.json -o ../frontend/src/api/generated.ts",
     "openapi:check": "pnpm openapi:generate && git diff --exit-code -- ../docs/api/openapi.json ../frontend/src/api/generated.ts",
     "prisma:generate": "prisma generate",
