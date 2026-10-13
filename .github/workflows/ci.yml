@@ -54,6 +54,7 @@ jobs:
 
       - name: Run Tests
         run: |
+          pnpm test:auth-matrix
           pnpm --filter @sigil/contracts test
           pnpm -r --if-present test
 

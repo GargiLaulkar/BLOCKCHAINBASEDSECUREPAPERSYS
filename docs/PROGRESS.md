@@ -47,5 +47,5 @@
 | BE-09 | Audit trace endpoints | Completed | Auditor-only traces validate MatchReport JSON, verify canonical Keccak evidence hashes, recheck the chain role, and restrict reads to the owner |
 | BE-10 | Security middleware, logging, uniform errors, rate limits | Completed | Strict frontend-origin CORS, Helmet, Zod request validation, differentiated auth/upload limits, sensitive-field redaction, section 11 checks; profiles hash `keccakJson({displayName, organisation})` using core RFC 8785 canonicalization |
 | BE-11 | OpenAPI document and generated frontend types | Completed | Zod-derived OpenAPI 3.1, generated frontend types, and CI drift check in place |
-| BE-12 | Authorisation matrix test suite | Not Started | Role matrix coverage |
-| BE-13 | `dev:all` and `demo:reset` scripts | Not Started | Developer tooling & scripts |
+| BE-12 | Authorisation matrix test suite | Completed | 294 table-driven endpoint/actor checks against a real Hardhat deployment and registered on-chain roles; route inventory fails if an API route lacks a matrix row |
+| BE-13 | `dev:all` and `demo:reset` scripts | Completed | One-command chain/PostgreSQL/migration/API/web startup, no-seed reset with safe BLOB_DIR guard, and README quickstart; full-stack run not executable in this environment because Docker is unavailable |
