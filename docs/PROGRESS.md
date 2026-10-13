@@ -34,18 +34,20 @@
 
 ## Backend & Data Progress (Member 3)
 
-| Task ID | Description | Status | Notes |
-|---|---|---|---|
-| BE-01 | Scaffold Express, config validation, Docker Compose for PostgreSQL | Completed | Config validation & /api/health tests passing |
-| BE-02 | Prisma schema and migrations (section 8.3) | Completed | Schema & initial SQL migration created |
-| BE-03 | SIWE authentication, session, chain-derived roles | Completed | EIP-4361, nonce replay & domain checks tested |
-| BE-04 | Exam metadata endpoints with hash verification | Completed | Filtered authenticated views, public summary variant, canonical hash check & authority verification |
-| BE-05 | Batch upload, confirmation, gated download | Completed | 5 MB multipart ciphertext uploads stored as pending with server-generated paths; chain-confirmed listing, role/state gating and hash-verified downloads tested |
-| BE-06 | Encrypted share endpoints | Completed | Authority PUT in Draft with envelope validation, holder-only GET /me |
-| BE-07 | Indexer (backfill, live, idempotent, resumable) | Completed | Section 7.3 event decoder, idempotent derived table mutations, resumable state, 24h unconfirmed batch purge |
-| BE-08 | Events and stats endpoints with pagination and filters | Completed | Public filtered event feed with stable cursor paging; authenticated indexed overview and readiness schemas; server-side share verification explicitly omitted |
-| BE-09 | Audit trace endpoints | Completed | Auditor-only traces validate MatchReport JSON, verify canonical Keccak evidence hashes, recheck the chain role, and restrict reads to the owner |
-| BE-10 | Security middleware, logging, uniform errors, rate limits | Completed | Strict frontend-origin CORS, Helmet, Zod request validation, differentiated auth/upload limits, sensitive-field redaction, section 11 checks; profiles hash `keccakJson({displayName, organisation})` using core RFC 8785 canonicalization |
-| BE-11 | OpenAPI document and generated frontend types | Completed | Zod-derived OpenAPI 3.1, generated frontend types, and CI drift check in place |
-| BE-12 | Authorisation matrix test suite | Completed | 294 table-driven endpoint/actor checks against a real Hardhat deployment and registered on-chain roles; route inventory fails if an API route lacks a matrix row |
-| BE-13 | `dev:all` and `demo:reset` scripts | Completed | One-command chain/PostgreSQL/migration/API/web startup, no-seed reset with safe BLOB_DIR guard, and README quickstart; full-stack run not executable in this environment because Docker is unavailable |
+| Task ID | Owner | Status | PR link | Notes |
+|---|---|---|---|---|
+| BE-01 | Member 3 | In review | — | Express/config and health tests exist, but `dev:all` could not reach the API: localhost:5432 refused connections, `DATABASE_URL` was absent from env/backend/.env, and Docker CLI was unavailable. |
+| BE-02 | Member 3 | In review | — | Prisma schema/migration exist. Clean migration/table verification could not run: Prisma P1012 reports `Environment variable not found: DATABASE_URL.` |
+| BE-03 | Member 3 | In review | — | EIP-4361 SIWE, one-time nonce, domain/signature checks, session and chain-derived role tests pass; peer review is not evidenced in this checkout. |
+| BE-04 | Member 3 | In review | — | Filtered authenticated views, public summary, canonical metadata hash check and creator-authority checks are implemented and tested; peer review is not evidenced in this checkout. |
+| BE-05 | Member 3 | In review | — | 5 MB multipart ciphertext uploads remain pending until a matching chain event; assignment/state checks and hash-verified gated downloads are tested; peer review is not evidenced. |
+| BE-06 | Member 3 | In review | — | Draft-only authority share storage validates envelopes; holders can fetch only their own encrypted share; peer review is not evidenced. |
+| BE-07 | Member 3 | In review | — | Added and passed a child-process kill/restart test against a real local Hardhat contract; it checked complete event coverage, unique event keys, `Exam.state`, `Batch.status`, and stable replay. Its durable test-row adapter is JSON-backed rather than PostgreSQL; peer review remains unconfirmed. |
+| BE-08 | Member 3 | In review | — | Public filtered event feed has stable cursor paging; authenticated indexed overview/readiness schemas omit server-unknowable share verification. Tests pass; peer review is not evidenced. |
+| BE-09 | Member 3 | In review | — | Auditor-only trace creation/read validates MatchReport, canonical evidence hash and trace ownership; tests pass; peer review is not evidenced. |
+| BE-10 | Member 3 | In review | — | Added backend ESLint/Prettier config and lint/format scripts; `corepack pnpm lint` passes (Solhint reports its existing max-states warning). Backend security/validator tests pass; peer review remains unconfirmed. |
+| BE-11 | Member 3 | In review | — | Zod-derived OpenAPI, served document, generated frontend types and CI drift check are implemented; prior frontend typecheck passed; peer review is not evidenced. |
+| BE-12 | Member 3 | In review | — | 295 real-chain authorization-matrix tests passed in this wrap-up (294 endpoint/actor cases plus route inventory); peer review is not evidenced. |
+| BE-13 | Member 3 | In review | — | Scripts now load backend/.env without overriding environment values, prefer configured DATABASE_URL, derive a Docker connection from Compose config when unset without printing credentials, and reject non-loopback reset databases. Actual reset/startup remains unverified: no local DB or Docker is available. |
+
+Current verification: backend typecheck passed; backend lint passed; root `corepack pnpm lint` passed (one existing Solhint warning); backend tests passed (52 passed; chain authorization and opt-in process integration suites skipped in that invocation); `node scripts/test-indexer-process.mjs` passed (1 test) against local Hardhat; `corepack pnpm test:auth-matrix` passed (295 tests). Local database checks failed/blocked because no DATABASE_URL, no PostgreSQL listener and no Docker CLI. Tasks stay In review where runtime/DoD evidence is missing. See [HANDOFF.md](./HANDOFF.md).
