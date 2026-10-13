@@ -6,6 +6,8 @@ import session from "express-session";
 import { createHealthRouter } from "./routes/health.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createExamsRouter } from "./routes/exams.js";
+import { createEventsRouter } from "./routes/events.js";
+import { createStatsRouter } from "./routes/stats.js";
 import type { Config } from "./config.js";
 import type { Provider, Contract } from "ethers";
 
@@ -42,6 +44,8 @@ export function createApp(
   // Mount endpoints
   app.use("/api", createHealthRouter(() => cfg, customProvider));
   app.use("/api/auth", createAuthRouter(() => cfg, customContract));
+  app.use("/api", createEventsRouter());
+  app.use("/api", createStatsRouter());
   app.use("/api/exams", createExamsRouter(() => cfg, customContract));
 
   // 404 Handler

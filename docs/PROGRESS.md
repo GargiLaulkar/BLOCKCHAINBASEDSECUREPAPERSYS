@@ -43,7 +43,7 @@
 | BE-05 | Batch upload, confirmation, gated download | Completed | 5 MB multipart ciphertext uploads stored as pending with server-generated paths; chain-confirmed listing, role/state gating and hash-verified downloads tested |
 | BE-06 | Encrypted share endpoints | Completed | Authority PUT in Draft with envelope validation, holder-only GET /me |
 | BE-07 | Indexer (backfill, live, idempotent, resumable) | Completed | Section 7.3 event decoder, idempotent derived table mutations, resumable state, 24h unconfirmed batch purge |
-| BE-08 | Events and stats endpoints with pagination and filters | Not Started | Event log API |
+| BE-08 | Events and stats endpoints with pagination and filters | Completed | Public filtered event feed with stable cursor paging; authenticated indexed overview and readiness schemas; server-side share verification explicitly omitted |
 | BE-09 | Audit trace endpoints | Not Started | Auditor leak traces |
 | BE-10 | Security middleware, logging, uniform errors, rate limits | Not Started | Helmet, pino, rate limits |
 | BE-11 | OpenAPI document and generated frontend types | Not Started | OpenAPI spec |
