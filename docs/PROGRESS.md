@@ -40,7 +40,7 @@
 | BE-02 | Prisma schema and migrations (section 8.3) | Completed | Schema & initial SQL migration created |
 | BE-03 | SIWE authentication, session, chain-derived roles | Completed | EIP-4361, nonce replay & domain checks tested |
 | BE-04 | Exam metadata endpoints with hash verification | Completed | Filtered authenticated views, public summary variant, canonical hash check & authority verification |
-| BE-05 | Batch upload, confirmation, gated download | Not Started | Multipart upload & gating |
+| BE-05 | Batch upload, confirmation, gated download | Completed | 5 MB multipart ciphertext uploads stored as pending with server-generated paths; chain-confirmed listing, role/state gating and hash-verified downloads tested |
 | BE-06 | Encrypted share endpoints | Completed | Authority PUT in Draft with envelope validation, holder-only GET /me |
 | BE-07 | Indexer (backfill, live, idempotent, resumable) | Completed | Section 7.3 event decoder, idempotent derived table mutations, resumable state, 24h unconfirmed batch purge |
 | BE-08 | Events and stats endpoints with pagination and filters | Not Started | Event log API |
@@ -49,4 +49,3 @@
 | BE-11 | OpenAPI document and generated frontend types | Not Started | OpenAPI spec |
 | BE-12 | Authorisation matrix test suite | Not Started | Role matrix coverage |
 | BE-13 | `dev:all` and `demo:reset` scripts | Not Started | Developer tooling & scripts |
-
