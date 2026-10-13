@@ -6,6 +6,41 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { prisma } from "../db.js";
 import type { Config } from "../config.js";
 
+async function isUserAssignedOrCreator(
+  examId: string,
+  userAddress: string,
+  contract: ethers.Contract
+): Promise<boolean> {
+  const normUser = ethers.getAddress(userAddress);
+
+  // 1. Check database PanelMember
+  const member = await prisma.panelMember.findFirst({
+    where: { examId, address: normUser },
+  });
+  if (member) return true;
+
+  // 2. Check on-chain exam authority and panel members
+  try {
+    const onChainExam = await contract.getExam(BigInt(examId));
+    if (ethers.getAddress(onChainExam.authority) === normUser) {
+      return true;
+    }
+    const [holders, setters, centres] = await contract.getPanel(BigInt(examId));
+    const all = [
+      ...holders.map((h: string) => ethers.getAddress(h)),
+      ...setters.map((s: string) => ethers.getAddress(s)),
+      ...centres.map((c: string) => ethers.getAddress(c)),
+    ];
+    if (all.includes(normUser)) {
+      return true;
+    }
+  } catch {
+    // contract read failed or exam not on chain
+  }
+
+  return false;
+}
+
 export function createExamsRouter(
   getConfigFn: () => Config,
   customContract?: ethers.Contract
@@ -20,6 +55,8 @@ export function createExamsRouter(
   }
 
   // GET /api/exams - list exams
+  // Authenticated: filtered to exams the caller is assigned to or created
+  // Unauthenticated: public summary variant without secrets
   router.get("/", async (req: Request, res: Response) => {
     try {
       const isAuthenticated = Boolean(req.session?.address);
@@ -28,7 +65,7 @@ export function createExamsRouter(
       });
 
       if (!isAuthenticated) {
-        // Public summary variant
+        // Public summary variant: exposes no secrets (Section 4.3 public data only)
         const publicExams = exams.map((e) => ({
           examId: e.examId,
           chainId: e.chainId,
@@ -44,8 +81,18 @@ export function createExamsRouter(
         return res.status(200).json(publicExams);
       }
 
-      // Authenticated view
-      const mapped = exams.map((e) => ({
+      // Authenticated view - filtered to exams the caller is assigned to or created
+      const callerAddr = ethers.getAddress(req.session!.address!);
+      const contract = getContract();
+
+      const filtered: typeof exams = [];
+      for (const e of exams) {
+        if (await isUserAssignedOrCreator(e.examId, callerAddr, contract)) {
+          filtered.push(e);
+        }
+      }
+
+      const mapped = filtered.map((e) => ({
         ...e,
         releaseOpensAt: e.releaseOpensAt.toString(),
         examStartsAt: e.examStartsAt.toString(),
@@ -64,6 +111,8 @@ export function createExamsRouter(
   });
 
   // GET /api/exams/:id - exam detail
+  // Authenticated: requires user to be assigned to or creator of exam
+  // Unauthenticated: public summary variant without secrets
   router.get("/:id", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -124,6 +173,18 @@ export function createExamsRouter(
         });
       }
 
+      const callerAddr = ethers.getAddress(req.session!.address!);
+      const contract = getContract();
+      const isAssigned = await isUserAssignedOrCreator(id, callerAddr, contract);
+      if (!isAssigned) {
+        return res.status(403).json({
+          error: {
+            code: "FORBIDDEN",
+            message: "You are not assigned to or creator of this exam",
+          },
+        });
+      }
+
       return res.status(200).json({
         ...exam,
         releaseOpensAt: exam.releaseOpensAt.toString(),
@@ -172,7 +233,7 @@ export function createExamsRouter(
         let onChainExam;
         try {
           onChainExam = await contract.getExam(BigInt(id));
-        } catch (err: any) {
+        } catch {
           return res.status(404).json({
             error: {
               code: "EXAM_NOT_FOUND",
@@ -182,10 +243,9 @@ export function createExamsRouter(
         }
 
         // 4. Verify caller is creating AUTHORITY
-        const callerAddress = req.session.address!;
+        const callerAddress = ethers.getAddress(req.session.address!);
         if (
-          ethers.getAddress(onChainExam.authority) !==
-          ethers.getAddress(callerAddress)
+          ethers.getAddress(onChainExam.authority) !== callerAddress
         ) {
           return res.status(403).json({
             error: {
