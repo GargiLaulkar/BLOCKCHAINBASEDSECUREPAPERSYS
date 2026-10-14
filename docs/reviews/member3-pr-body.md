@@ -17,7 +17,7 @@ Detailed scope, full commit hashes, task-to-file mapping, verification results, 
 - `corepack pnpm lint` passed with the existing Member 1 Solhint max-states warning.
 - Backend typecheck passed.
 - Backend test suite: 52 passed, 296 skipped; separate indexer process test: 1 passed; authorization matrix: 295 passed.
-- Secret triage found only safe test/config fixtures, hash/seed vectors, and code/documentation mentions; no local `.env` password match in tracked files or branch commit patches.
+- Secret-pattern review identified database URLs only in application setup, test configuration, and dynamic localhost URL construction. Exact comparison found no ignored `.env` password match in tracked files or branch commit patches; hash/seed vectors and keystore references are test/source/documentation material.
 
 ## Review requested
 

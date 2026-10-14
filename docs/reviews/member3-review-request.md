@@ -2,7 +2,7 @@
 
 **Branch:** `m3/BE-wrapup-verification`
 **Pull request title:** `Member 3: backend BE-01..BE-13 (review request)`
-**Pull request:** Not opened; `gh` is not installed. Use [member3-pr-body.md](./member3-pr-body.md) to open the PR manually.
+**Pull request:** [GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS#1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) — open against `main`; head `81b72fd22edd13e9619b3fbc520de2f2c6a1f233`.
 **Review status:** Awaiting Member 2. All BE-01 through BE-13 remain **In review** until approval.
 
 ## Scope

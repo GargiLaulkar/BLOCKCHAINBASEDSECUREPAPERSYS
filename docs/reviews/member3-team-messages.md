@@ -10,4 +10,4 @@ Member 3's BE-01..BE-13 work is ready for Gate 2 review. Root lint passes with t
 
 ## To Member 2
 
-Please review the Member 3 BE-01..BE-13 request on `m3/BE-wrapup-verification` and complete the checklist at `docs/reviews/member3-review-request.md`. PR body/title are in `docs/reviews/member3-pr-body.md` because GitHub CLI is unavailable. All BE tasks remain In review pending your review.
+Please review [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) for Member 3 BE-01..BE-13 and complete the checklist at `docs/reviews/member3-review-request.md`. All BE tasks remain In review pending your approval.
