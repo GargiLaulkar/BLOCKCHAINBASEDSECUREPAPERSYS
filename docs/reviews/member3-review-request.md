@@ -2,7 +2,7 @@
 
 **Branch:** `m3/BE-wrapup-verification`
 **Pull request title:** `Member 3: backend BE-01..BE-13 (review request)`
-**Pull request:** [GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS#1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) — open against `main`; head `81b72fd22edd13e9619b3fbc520de2f2c6a1f233`.
+**Pull request:** [GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS#1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) — open against `main`; remote head verified `f2c67fd5a94478816bd39536bddc444e9e748aca` on 2026-10-14.
 **Review status:** Awaiting Member 2. All BE-01 through BE-13 remain **In review** until approval.
 
 ## Scope
