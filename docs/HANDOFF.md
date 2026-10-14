@@ -2,7 +2,7 @@
 
 ## Current task
 
-Verification run completed for BE-01, BE-02, BE-07, BE-10 and BE-13 against local PostgreSQL and Hardhat on 2026-10-14. The docs record the results; Member 2 peer review remains pending.
+Prepare Member 3 BE-01..BE-13 for Member 2 peer review. Branch: `m3/BE-wrapup-verification`. Review request: [member3-review-request.md](./reviews/member3-review-request.md). PR not opened because GitHub CLI (`gh`) is unavailable; title/body: [member3-pr-body.md](./reviews/member3-pr-body.md). Review status: pending; every BE task remains In review until Member 2 approves.
 
 ## What is done
 
@@ -15,11 +15,16 @@ Verification run completed for BE-01, BE-02, BE-07, BE-10 and BE-13 against loca
 - Ran backend typecheck, root lint, backend tests, child process test, and authorization matrix. Current results are recorded below.
 - In the 2026-10-14 verification run, Prisma migrations deployed, all seven section 8.3 tables were confirmed, and reset left the tables and `BLOB_DIR` empty. `dev:all` used the configured `DATABASE_URL` (not Docker), started chain/API/web, and the existing health endpoint returned HTTP 200.
 - Restored generated `packages/contracts-types` files and removed the generated `contracts/deployments/localhost.json` after verification. No frozen interface or OpenAPI file was changed.
+- Secret triage completed without displaying values: database/session strings were test/config fixtures; 64-hex strings were hashes, seeds, or test vectors; keystore matches were code/docs. Exact local `.env` password search found no match in tracked files or `git log -p origin/main..HEAD`; no tracked keystore data file was found.
+- Created the review request/checklist, PR title/body, and ready-to-send team messages under `docs/reviews/`.
 
 ## Files changed in this verification run
 
 - `docs/HANDOFF.md`
 - `docs/PROGRESS.md`
+- `docs/reviews/member3-review-request.md`
+- `docs/reviews/member3-pr-body.md`
+- `docs/reviews/member3-team-messages.md`
 
 Generated contract-type files were restored and the untracked localhost deployment artifact was removed. No runtime or frozen interface files were changed.
 
@@ -27,25 +32,25 @@ Generated contract-type files were restored and the untracked localhost deployme
 
 | Task | Assessment |
 |---|---|
-| BE-01 | Verified in this run: `dev:all` used the configured PostgreSQL URL, skipped Docker, and started the chain, API, and web. `GET /api/health` returned HTTP 200 with the existing response shape. |
-| BE-02 | Verified in this run: `prisma migrate deploy` applied the migration; reset reapplied it to a clean database; Prisma introspection confirmed the seven section 8.3 tables. All seven contained zero rows after reset and after `dev:all`. |
-| BE-03 | SIWE nonce replay, domain, signature, session and chain-derived role behavior covered by passing backend tests. |
-| BE-04 | Metadata hash mismatch and authority/assignment/public-summary behavior covered by passing tests. |
-| BE-05 | Pending/confirmed upload behavior, multipart/type/size checks, assignment/state gates and tampered-file download rejection covered by passing tests. |
-| BE-06 | Encrypted share validation and holder-only retrieval are covered by passing tests. |
-| BE-07 | The new process test passed against a local Hardhat contract: it killed the child after RPC log retrieval and before persistence, restarted from the persisted cursor, compared every expected log key, checked unique keys and confirmed Exam/Batch projections, then replayed and compared the projection. The persistent row adapter is JSON-backed; no PostgreSQL is exercised by this process test. |
-| BE-08 | Filter combinations, stable pagination, invalid pagination, authenticated stats and indexed-only readiness are covered; OpenAPI response schemas are included. |
-| BE-09 | Auditor-only create/read, invalid reports/hash, owner scoping and chain-role recheck are covered by passing tests. |
-| BE-10 | Security/header/CORS/rate-limit/redaction/error-shape/validator tests pass. Backend lint and root recursive lint pass after adding config; Solhint emits its existing max-states warning but exits successfully. |
-| BE-11 | Zod-derived OpenAPI and generated frontend types are present; prior frontend typecheck and CI drift-check configuration are recorded. |
-| BE-12 | 295 real-Hardhat authorization-matrix tests passed: endpoint/actor cases plus the route-inventory guard. |
-| BE-13 | Verified in this run: `demo:reset` reset the local database and chain, emptied `BLOB_DIR`, and seeded no demo records. `dev:all` used `DATABASE_URL` and started chain/API/web. `dev:all` then registered the configured demo role accounts on the local chain as designed; the database remained empty. |
+| BE-01 | Runtime verified; awaiting Member 2 peer review. `dev:all` used configured PostgreSQL, skipped Docker, and started chain/API/web; health returned HTTP 200. |
+| BE-02 | Runtime verified; awaiting Member 2 peer review. Migration deployed and all seven section 8.3 tables were confirmed empty after reset and startup. |
+| BE-03 | SIWE nonce replay, domain, signature, session, and chain-derived-role tests pass; awaiting Member 2 review. |
+| BE-04 | Metadata hash, authority/assignment, and public-summary behavior tested; awaiting Member 2 review. |
+| BE-05 | Pending/confirmed upload, validation, assignment/state gates, and tampered-file rejection tested; awaiting Member 2 review. |
+| BE-06 | Encrypted share validation and holder-only retrieval tested; awaiting Member 2 review. |
+| BE-07 | Process test passed against real Hardhat logs; the persistent row adapter is JSON-backed, not PostgreSQL. Awaiting Member 2 review. |
+| BE-08 | Filtered cursor paging, validation, authenticated stats, and readiness schemas tested; awaiting Member 2 review. |
+| BE-09 | Auditor-only trace create/read, report/hash validation, and ownership tested; awaiting Member 2 review. |
+| BE-10 | Backend lint/security/validator tests pass; root lint retains the existing Member 1 Solhint warning. Awaiting Member 2 review. |
+| BE-11 | OpenAPI and generated frontend types are present; awaiting Member 2 review. |
+| BE-12 | Authorization matrix passed 295 tests; awaiting Member 2 review. |
+| BE-13 | Reset and `dev:all` runtime verified; awaiting Member 2 review. |
 
 ## Definition of Done gaps
 
 - **BE-07 production-database restart:** the OS child process was killed/restarted and its durable JSON row projection verified against real Hardhat logs; repeat with PostgreSQL if process restart must specifically prove real database transaction behavior.
 - **Health response:** `/api/health` returned HTTP 200 and its existing chain-connectivity response; it was not modified because the interface is frozen.
-- **Peer review:** Member 2's peer review remains pending; this run verifies runtime criteria only and does not claim review completion.
+- **Peer review:** Member 2's review is pending; all BE-01..BE-13 remain In review. This package does not claim approval.
 
 Verification results: `corepack pnpm --filter @sigil/backend typecheck` passed; `corepack pnpm lint` passed with the existing Solhint `max-states-count` warning; backend tests passed (52 passed, 296 skipped, including the opt-in process and auth-matrix suites); `node scripts/test-indexer-process.mjs` passed (1 test); `corepack pnpm test:auth-matrix` passed (295 tests). Prisma migration deploy and reset passed. All seven application tables were empty after reset and after startup, and `BLOB_DIR` had zero entries. Interfaces in sections 6–9 and `docs/api/openapi.json` were not changed.
 
@@ -57,7 +62,9 @@ Verification results: `corepack pnpm --filter @sigil/backend typecheck` passed; 
 ## What remains
 
 1. Obtain and record Member 2's peer review.
-2. If BE-07 requires production-database crash/restart evidence, repeat the process test with PostgreSQL-backed persistence; its current durable test adapter is JSON-backed.
+2. Complete the Gate 2 walking-skeleton check once Members 4 and 5 deliver the frontend (section 16).
+3. Complete final integration review under the section 15 review ring.
+4. If required for BE-07, repeat the crash/restart test with PostgreSQL-backed persistence; its current durable adapter is JSON-backed.
 
 ## Commands to run
 
