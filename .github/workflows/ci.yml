@@ -47,6 +47,9 @@ jobs:
       - name: Typecheck generated frontend API types
         run: pnpm --filter @sigil/backend exec -- tsc -p ../frontend/tsconfig.json
 
+      - name: Compile contracts for TypeChain types
+        run: pnpm --filter @sigil/contracts exec hardhat compile
+
       - name: Run Typechecks
         run: |
           pnpm --filter @sigil/contracts typecheck
