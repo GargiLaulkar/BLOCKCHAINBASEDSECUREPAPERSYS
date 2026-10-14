@@ -2,7 +2,7 @@
 
 ## Current task
 
-Verify BE-01, BE-02, BE-07, BE-10 and BE-13 with a local database/Hardhat chain where available; fix dev scripts, establish backend lint, add a process-level indexer restart test, update progress and preserve all frozen interfaces.
+Verification run completed for BE-01, BE-02, BE-07, BE-10 and BE-13 against local PostgreSQL and Hardhat on 2026-10-14. The docs record the results; Member 2 peer review remains pending.
 
 ## What is done
 
@@ -12,22 +12,23 @@ Verify BE-01, BE-02, BE-07, BE-10 and BE-13 with a local database/Hardhat chain 
 - Updated `demo:reset` to load backend configuration, require a loopback database, run `prisma migrate reset --force --skip-seed`, reset the local chain, clear `BLOB_DIR`, and redeploy empty.
 - Added backend ESLint/Prettier config and lint/format scripts; corrected existing unused imports/variables and made root lint work when called via Corepack.
 - Added an opt-in child-process kill/restart test which indexes actual Hardhat contract logs, checks complete log coverage and unique event keys, and compares Exam/Batch projections after replay. It uses a JSON-backed persistent test adapter, not PostgreSQL.
-- Ran backend typecheck, backend lint, root lint, backend tests, child process test, and authorization matrix. Results and database blocker are below.
+- Ran backend typecheck, root lint, backend tests, child process test, and authorization matrix. Current results are recorded below.
+- In the 2026-10-14 verification run, Prisma migrations deployed, all seven section 8.3 tables were confirmed, and reset left the tables and `BLOB_DIR` empty. `dev:all` used the configured `DATABASE_URL` (not Docker), started chain/API/web, and the existing health endpoint returned HTTP 200.
+- Restored generated `packages/contracts-types` files and removed the generated `contracts/deployments/localhost.json` after verification. No frozen interface or OpenAPI file was changed.
 
-## Wrap-up files touched
+## Files changed in this verification run
 
-- `docs/backend-chapter.md` (new)
-- `docs/HANDOFF.md` (new)
+- `docs/HANDOFF.md`
 - `docs/PROGRESS.md`
 
-No runtime or frozen interface files were touched.
+Generated contract-type files were restored and the untracked localhost deployment artifact was removed. No runtime or frozen interface files were changed.
 
 ## BE-01..BE-13 check against “Done when”
 
 | Task | Assessment |
 |---|---|
-| BE-01 | Config and health tests pass. The `dev:api` boot criterion was not verified because `dev:all` could not start PostgreSQL (Docker absent and no DATABASE_URL), so it never started the API. |
-| BE-02 | Prisma schema/migration exist. Applying migrations to a clean PostgreSQL database remains unverified because no local database or Docker was available. |
+| BE-01 | Verified in this run: `dev:all` used the configured PostgreSQL URL, skipped Docker, and started the chain, API, and web. `GET /api/health` returned HTTP 200 with the existing response shape. |
+| BE-02 | Verified in this run: `prisma migrate deploy` applied the migration; reset reapplied it to a clean database; Prisma introspection confirmed the seven section 8.3 tables. All seven contained zero rows after reset and after `dev:all`. |
 | BE-03 | SIWE nonce replay, domain, signature, session and chain-derived role behavior covered by passing backend tests. |
 | BE-04 | Metadata hash mismatch and authority/assignment/public-summary behavior covered by passing tests. |
 | BE-05 | Pending/confirmed upload behavior, multipart/type/size checks, assignment/state gates and tampered-file download rejection covered by passing tests. |
@@ -38,28 +39,25 @@ No runtime or frozen interface files were touched.
 | BE-10 | Security/header/CORS/rate-limit/redaction/error-shape/validator tests pass. Backend lint and root recursive lint pass after adding config; Solhint emits its existing max-states warning but exits successfully. |
 | BE-11 | Zod-derived OpenAPI and generated frontend types are present; prior frontend typecheck and CI drift-check configuration are recorded. |
 | BE-12 | 295 real-Hardhat authorization-matrix tests passed: endpoint/actor cases plus the route-inventory guard. |
-| BE-13 | Script changes and README paths are present. End-to-end startup/reset could not be verified: this environment had no configured DATABASE_URL, no PostgreSQL listener, and no Docker CLI. |
+| BE-13 | Verified in this run: `demo:reset` reset the local database and chain, emptied `BLOB_DIR`, and seeded no demo records. `dev:all` used `DATABASE_URL` and started chain/API/web. `dev:all` then registered the configured demo role accounts on the local chain as designed; the database remained empty. |
 
 ## Definition of Done gaps
 
-- **BE-01, BE-02 and BE-13 runtime evidence:** still requires a configured local PostgreSQL instance or Docker Desktop to verify API startup, clean migrations, schema tables, full `dev:all`, health, reset emptiness and no seed data.
 - **BE-07 production-database restart:** the OS child process was killed/restarted and its durable JSON row projection verified against real Hardhat logs; repeat with PostgreSQL if process restart must specifically prove real database transaction behavior.
-- **Health response:** the existing `/api/health` response reports chain connectivity only. Adding a database status field would alter an interface in section 8.2, so it was not changed under the explicit frozen-interface rule. No health request could be served because `dev:all` stopped before API startup.
-- **Peer review:** no PR or reviewer evidence is present in the current workspace history, so “reviewed by another member” cannot be confirmed from this checkout.
+- **Health response:** `/api/health` returned HTTP 200 and its existing chain-connectivity response; it was not modified because the interface is frozen.
+- **Peer review:** Member 2's peer review remains pending; this run verifies runtime criteria only and does not claim review completion.
 
-Backend typecheck, lint, current backend tests, process-restart test, and authorization matrix passed. No reset was performed because the script refused safely before destructive operations without DATABASE_URL. Interface files and `docs/api/openapi.json` were not changed. Database-dependent acceptance criteria remain explicitly unverified.
+Verification results: `corepack pnpm --filter @sigil/backend typecheck` passed; `corepack pnpm lint` passed with the existing Solhint `max-states-count` warning; backend tests passed (52 passed, 296 skipped, including the opt-in process and auth-matrix suites); `node scripts/test-indexer-process.mjs` passed (1 test); `corepack pnpm test:auth-matrix` passed (295 tests). Prisma migration deploy and reset passed. All seven application tables were empty after reset and after startup, and `BLOB_DIR` had zero entries. Interfaces in sections 6–9 and `docs/api/openapi.json` were not changed.
 
-## Implementation scope reviewed
+## Earlier implementation scope
 
 - `backend/` implementation and tests for BE-01..BE-13 (completed in the prior task commits recorded in Git history and `PROGRESS.md`)
-- Current wrap-up documentation files listed above
+- Backend documentation and scripts from the preceding implementation work
 
 ## What remains
 
-1. Start PostgreSQL on `localhost:5432`, configure `DATABASE_URL` in `backend/.env` or the environment (without printing it), and retry migration/reset/full-stack checks.
-2. Confirm all seven section 8.3 database tables, that reset empties the database and blob directory, and that startup seeds no business/demo rows.
-3. Resolve the frozen-interface conflict if health must report database connectivity; otherwise query the database separately and leave `/api/health` as-is.
-4. Obtain and record another member's review.
+1. Obtain and record Member 2's peer review.
+2. If BE-07 requires production-database crash/restart evidence, repeat the process test with PostgreSQL-backed persistence; its current durable test adapter is JSON-backed.
 
 ## Commands to run
 
@@ -71,37 +69,38 @@ corepack pnpm lint
 corepack pnpm --filter @sigil/backend test
 node scripts/test-indexer-process.mjs
 corepack pnpm test:auth-matrix
-corepack pnpm --filter @sigil/backend openapi:check
-corepack pnpm dev:all
+corepack pnpm --filter @sigil/backend exec prisma migrate deploy --schema prisma/schema.prisma
 corepack pnpm demo:reset
+corepack pnpm dev:all
 ```
 
-`backend test` uses the local Hardhat JSON-RPC node at `127.0.0.1:8545` for indexer tests. `test:indexer-process` also requires the local chain and runs the real child-process restart test. `test:auth-matrix` starts its own isolated local Hardhat node. `dev:all` uses `DATABASE_URL` if configured; otherwise it requires Docker. `demo:reset` requires `DATABASE_URL` to point to `localhost` or `127.0.0.1` and a local Hardhat chain.
+Backend tests and `node scripts/test-indexer-process.mjs` use the local Hardhat JSON-RPC node at `127.0.0.1:8545`. `corepack pnpm test:auth-matrix` starts its own isolated local Hardhat node. `dev:all` uses `DATABASE_URL` if configured; otherwise it requires Docker. `demo:reset` requires `DATABASE_URL` to point to `localhost` or `127.0.0.1` and a local Hardhat chain with ID 31337.
 
-## Failing tests and their errors
+## Transient failures and final outcomes
 
-- `DATABASE_URL` detection: absent in the environment and backend/.env. PostgreSQL TCP check: `127.0.0.1:5432` unavailable. Docker CLI: unavailable.
-- Prisma migration attempt failed with Prisma `P1012`: `Environment variable not found: DATABASE_URL.`
-- `corepack pnpm demo:reset` failed safely: `Refusing to reset: DATABASE_URL must be configured in the environment or backend/.env and point to a local PostgreSQL database.`
-- Remote-host guard check failed safely before contacting any database or chain: `Refusing to reset a non-local database host: db.example.invalid.`
-- `corepack pnpm dev:all` started a local chain and deployed `ExamVault`, selected Docker fallback, then failed: `'docker' is not recognized as an internal or external command`; API/web were not started.
-- `GET http://127.0.0.1:4000/api/health` failed: `Unable to connect to the remote server`.
+- `corepack pnpm dev:chain` initially failed because its script invokes bare `pnpm`: `'pnpm' is not recognized as an internal or external command, operable program or batch file.` The local node was started with `corepack pnpm --filter @sigil/contracts exec hardhat node` and stopped after verification.
+- First `corepack pnpm demo:reset` attempt failed before database/chain reset because the local Hardhat node was not running: `fetch failed`. After starting the node with Corepack, the reset succeeded.
+- The initial API and web probes occurred before `dev:all` finished startup and failed with `Unable to connect to the remote server`; final checks succeeded after readiness: API health HTTP 200 and web HTTP 200.
+- `corepack pnpm --filter @sigil/backend exec prisma migrate deploy --schema prisma/schema.prisma`: passed; migration `20261003000000_init` applied.
+- Prisma read-only introspection confirmed `Exam`, `Participant`, `PanelMember`, `Batch`, `EncryptedShare`, `ChainEvent`, and `LeakTrace`.
+- `corepack pnpm demo:reset`: passed on retry; migration reset succeeded, chain ID was 31337, deployment completed, all seven database table counts were zero, and `BLOB_DIR` had zero entries. No demo records were seeded by reset.
+- `corepack pnpm dev:all`: passed; output confirmed `Using PostgreSQL configured by DATABASE_URL; skipping Docker.` Chain, API, and web started. Health returned `status: ok`, `chain.connected: true`, and `chainId: 31337`; web returned HTTP 200.
+- After `dev:all`, all seven table counts remained zero and `BLOB_DIR` remained empty. Startup's explicit role bootstrap registered demo roles on the local chain.
 - `corepack pnpm --filter @sigil/backend typecheck`: passed.
-- `corepack pnpm --filter @sigil/backend lint`: passed.
-- `corepack pnpm lint`: passed; existing Solhint warning `Contract has 22 states declarations but allowed no more than 15`.
-- `corepack pnpm --filter @sigil/backend test`: passed, 52 passed; authorization matrix and opt-in process test skipped in that run.
+- `corepack pnpm lint`: passed; existing Solhint warning: `Contract has 22 states declarations but allowed no more than 15`.
+- `corepack pnpm --filter @sigil/backend test`: passed, 52 passed and 296 skipped (authorization matrix and opt-in process test are run separately).
 - `node scripts/test-indexer-process.mjs`: passed, 1 test.
 - `corepack pnpm test:auth-matrix`: passed, 295 tests.
+- All started local services were stopped. Ports 4000, 5173, and 8545 were confirmed stopped. Generated contract type files were restored and the untracked local deployment artifact was removed.
 
 ## Open questions
 
 - Who will provide the required Member 2 review of Member 3 work?
-- Should `/api/health` gain a database connectivity field? This would conflict with the instruction not to change interfaces in sections 6–9; no interface change was made.
 
 ## Decisions made and why
 
 - The final-report chapter is a separate `docs/backend-chapter.md` so the report assembler can incorporate it without editing frozen API or contract interfaces.
 - Docker fallback reads resolved Compose service settings in memory to form the host connection URL; it does not print the Compose configuration or database credentials.
 - Reset requires a loopback PostgreSQL host and local Hardhat chain ID 31337, runs Prisma with `--skip-seed`, and does not proceed if DATABASE_URL is absent or remote.
-- Verification claims distinguish passing local-chain tests from unverified PostgreSQL operations; no database/reset success is claimed.
+- Verification claims distinguish completed PostgreSQL reset/startup checks from the JSON-backed process-test adapter used for BE-07.
 - No API, contract or OpenAPI interface was changed.
