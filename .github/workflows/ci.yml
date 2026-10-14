@@ -53,6 +53,9 @@ jobs:
       - name: Build contracts-types package
         run: pnpm --filter @sigil/contracts-types build
 
+      - name: Generate Prisma Client
+        run: pnpm --filter @sigil/backend exec prisma generate --schema prisma/schema.prisma
+
       - name: Run Typechecks
         run: |
           pnpm --filter @sigil/contracts typecheck
