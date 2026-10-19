@@ -38,6 +38,8 @@ jobs:
           pnpm --filter @sigil/contracts lint
           pnpm -r --if-present lint
 
+      - name: Compile Contracts and Generate Types
+        run: pnpm --filter @sigil/contracts compile
       - name: Run Typechecks
         run: |
           pnpm --filter @sigil/contracts typecheck
