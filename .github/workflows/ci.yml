@@ -64,16 +64,15 @@ jobs:
       - name: Run Tests
         run: |
           set -euo pipefail
-          setsid pnpm --filter @sigil/contracts exec hardhat node > "$RUNNER_TEMP/hardhat-node.log" 2>&1 &
+          pnpm --filter @sigil/contracts exec hardhat node --hostname 127.0.0.1 > "$RUNNER_TEMP/hardhat-node.log" 2>&1 &
           node_pid=$!
           cleanup() {
-            kill -- "-$node_pid" 2>/dev/null || true
-            wait "$node_pid" 2>/dev/null || true
+            kill "$node_pid" 2>/dev/null || true
           }
           trap cleanup EXIT
 
           ready=false
-          for _ in $(seq 1 30); do
+          for _ in $(seq 1 60); do
             if curl --silent --fail \
               -H "Content-Type: application/json" \
               --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
@@ -89,7 +88,6 @@ jobs:
           fi
 
           pnpm test:auth-matrix
-          pnpm --filter @sigil/contracts test
           pnpm -r --if-present test
 
       - name: Run Smart Contract Coverage
