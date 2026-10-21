@@ -14,3 +14,40 @@
 | SC-10 | Hardhat demo tasks: `demo:bootstrap-roles` (idempotent role assignment, address printing) and `demo:advance-time` (restricted to local development networks) | Completed | Tested on Hardhat EVM |
 | INT-01 | GitHub Actions CI (`.github/workflows/ci.yml`), contract coverage threshold enforcement script (`check-coverage.ts`), artifact upload | Completed | Verified local lint, typecheck, tests, coverage check |
 | INT-03 | Generated contract specification (`gen-contract-spec.ts` -> `docs/contract-spec.md`), comprehensive threat model with real test evidence (`docs/threat-model.md`) | Completed | Verified drift check & spec generation |
+
+## Cryptography & Core Package Progress (Member 2)
+
+| Task ID | Description | Status | Notes |
+|---|---|---|---|
+| CR-01 | Scaffold package `@sigil/core`, Vitest, exports map | Completed | Builds for browser and Node |
+| CR-02 | Canonical JSON (`canonicalize`) and `keccakJson` helpers | Completed | Known-answer tests pass |
+| CR-03 | Envelope encryption and decryption with AAD | Completed | Tamper tests pass |
+| CR-04 | Shamir wrapper, share commitments, combine and key-match check | Completed | All t-of-n combinations tested |
+| CR-05 | Holder keystore (PBKDF2, AES-GCM) and deterministic reveal | Completed | Passphrase and reveal tested |
+| CR-06 | Ceremony function | Completed | Private key wiped |
+| CR-07 | Paper selection, variants, variant hash, set code, answer key | Completed | Determinism and vectors |
+| CR-08 | `zod` schemas for questions, batches, meta, variants, API payloads | Completed | Schema validation |
+| CR-09 | Leak matcher and synthetic test suite | Completed | Token 3-gram & Kendall tau matching |
+| CR-10 | Encrypted local draft helper for setters (P1) | Completed | Round-trip tested |
+| CR-11 | Performance and browser-compatibility checks | Completed | Met <1s target |
+| CR-12 | Crypto review of usage | Completed | Reviewed |
+
+## Backend & Data Progress (Member 3)
+
+| Task ID | Owner | Status | PR link | Notes |
+|---|---|---|---|---|
+| BE-01 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Runtime verified: `dev:all` used configured `DATABASE_URL`, skipped Docker, and started chain/API/web; `/api/health` returned HTTP 200. Approved by Member 2 peer review. |
+| BE-02 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Runtime verified: migration applied; all seven section 8.3 tables confirmed and empty after reset/startup. Approved by Member 2 peer review. |
+| BE-03 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | SIWE nonce/domain/signature, sessions, and chain-derived roles are tested. Approved by Member 2 peer review. |
+| BE-04 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Filtered authenticated views, public summary, canonical metadata hash, and creator-authority checks are implemented/tested. Approved by Member 2 peer review. |
+| BE-05 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Ciphertext upload/download gates and pending-to-confirmed flow are tested. Approved by Member 2 peer review. |
+| BE-06 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Encrypted share validation and holder-only retrieval are tested. Approved by Member 2 peer review. |
+| BE-07 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Process restart test passed against real Hardhat logs; persistence adapter is JSON-backed, not PostgreSQL. Approved by Member 2 peer review. |
+| BE-08 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Filtered cursor-paged event feed and stats/readiness schemas are tested. Approved by Member 2 peer review. |
+| BE-09 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Auditor-only trace creation/read, report/hash validation, and ownership are tested. Approved by Member 2 peer review. |
+| BE-10 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Backend lint/security middleware and validation tests pass; root lint has the existing Member 1 Solhint warning. Approved by Member 2 peer review. |
+| BE-11 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | OpenAPI generation and frontend types are present. Approved by Member 2 peer review. |
+| BE-12 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Authorization matrix passed 295 tests. Approved by Member 2 peer review. |
+| BE-13 | Member 3 | Completed | [PR #1](https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1) | Reset and `dev:all` runtime checks passed; all DB tables and `BLOB_DIR` remained empty. Approved by Member 2 peer review. |
+
+Current verification (2026-10-18 / 2026-10-19): migration deploy and reset passed; all seven PostgreSQL application tables and `BLOB_DIR` were empty after reset/startup; `dev:all` used `DATABASE_URL` and started chain/API/web; `/api/health` returned HTTP 200. Root lint and backend typecheck passed; backend suite 52 passed/296 skipped; indexer process 1 passed; authorization matrix 295 passed; @sigil/core 17 passed; @sigil/contracts 149 passed with 100% statement / 96.36% branch coverage; zero OpenAPI and contract spec drift. **All BE-01..BE-13 Completed and approved by Member 2.** Review package: [member3-review-request.md](./reviews/member3-review-request.md). Branch: `m3/BE-wrapup-verification`. PR #1: https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1. Remote PR head `f2c67fd5a94478816bd39536bddc444e9e748aca` (20 commits). Remaining: Gate 2 walking-skeleton check after frontend delivery, and final integration review (section 15 review ring). See [HANDOFF.md](./HANDOFF.md).

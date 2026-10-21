@@ -38,8 +38,24 @@ jobs:
           pnpm --filter @sigil/contracts lint
           pnpm -r --if-present lint
 
-      - name: Compile Contracts and Generate Types
-        run: pnpm --filter @sigil/contracts compile
+      - name: Build shared schemas and verify OpenAPI contract
+        run: |
+          pnpm --filter @sigil/core build
+          pnpm --filter @sigil/backend openapi:generate
+          git diff --exit-code -- docs/api/openapi.json frontend/src/api/generated.ts
+
+      - name: Typecheck generated frontend API types
+        run: pnpm --filter @sigil/backend exec -- tsc -p ../frontend/tsconfig.json
+
+      - name: Compile contracts for TypeChain types
+        run: pnpm --filter @sigil/contracts exec hardhat compile
+
+      - name: Build contracts-types package
+        run: pnpm --filter @sigil/contracts-types build
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @sigil/backend exec prisma generate --schema prisma/schema.prisma
+
       - name: Run Typechecks
         run: |
           pnpm --filter @sigil/contracts typecheck
@@ -47,7 +63,31 @@ jobs:
 
       - name: Run Tests
         run: |
-          pnpm --filter @sigil/contracts test
+          set -euo pipefail
+          pnpm --filter @sigil/contracts exec hardhat node --hostname 127.0.0.1 > "$RUNNER_TEMP/hardhat-node.log" 2>&1 &
+          node_pid=$!
+          cleanup() {
+            kill "$node_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=false
+          for _ in $(seq 1 60); do
+            if curl --silent --fail \
+              -H "Content-Type: application/json" \
+              --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+              http://127.0.0.1:8545 | grep -q '"result":"0x7a69"'; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/hardhat-node.log"
+            exit 1
+          fi
+
+          pnpm test:auth-matrix
           pnpm -r --if-present test
 
       - name: Run Smart Contract Coverage

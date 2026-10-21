@@ -4,6 +4,7 @@
   "private": true,
   "description": "SIGIL Smart Contracts (ExamVault)",
   "scripts": {
+    "hardhat": "hardhat",
     "compile": "hardhat compile",
     "test": "hardhat test",
     "typecheck": "tsc --noEmit",
