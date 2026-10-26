@@ -1,0 +1,97 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Exam {
+  id             String   @id @default(uuid())
+  chainId        Int
+  examId         String   @unique
+  metaHash       String
+  metaJson       Json?
+  state          Int      @default(0)
+  releaseOpensAt BigInt
+  examStartsAt   BigInt
+  examEndsAt     BigInt
+  threshold      Int
+  bankHash       String?
+  seed           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Participant {
+  address      String   @id
+  roles        Json
+  displayName  String?
+  organisation String?
+  profileHash  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PanelMember {
+  id        String   @id @default(uuid())
+  examId    String
+  address   String
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@unique([examId, address, kind])
+}
+
+model Batch {
+  id             String   @id @default(uuid())
+  examId         String
+  batchId        BigInt?
+  sectionId      Int
+  setter         String
+  ciphertextHash String
+  questionCount  Int
+  startInSection Int
+  blobPath       String
+  status         String   @default("pending")
+  txHash         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([examId, sectionId, ciphertextHash])
+}
+
+model EncryptedShare {
+  id        String   @id @default(uuid())
+  examId    String
+  holder    String
+  envelope  Bytes
+  createdAt DateTime @default(now())
+
+  @@unique([examId, holder])
+}
+
+model ChainEvent {
+  id             String   @id @default(uuid())
+  blockNumber    BigInt
+  logIndex       Int
+  txHash         String
+  examId         String?
+  type           String
+  actor          String?
+  payloadJson    Json
+  blockTimestamp BigInt
+  createdAt      DateTime @default(now())
+
+  @@unique([txHash, logIndex])
+}
+
+model LeakTrace {
+  id           String   @id @default(uuid())
+  examId       String
+  auditor      String
+  evidenceHash String
+  resultJson   Json
+  createdAt    DateTime @default(now())
+}
