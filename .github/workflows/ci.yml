@@ -51,7 +51,9 @@ jobs:
         run: pnpm --filter @sigil/contracts exec hardhat compile
 
       - name: Build contracts-types package
-        run: pnpm --filter @sigil/contracts-types build
+        run: |
+          node scripts/export-abi.mjs
+          pnpm --filter @sigil/contracts-types build
 
       - name: Generate Prisma Client
         run: pnpm --filter @sigil/backend exec prisma generate --schema prisma/schema.prisma
@@ -61,13 +63,27 @@ jobs:
           pnpm --filter @sigil/contracts typecheck
           pnpm -r --if-present typecheck
 
-      - name: Run Tests
+      - name: Run Smart Contract Tests
+        run: pnpm --filter @sigil/contracts test
+
+      - name: Run Smart Contract Coverage
+        run: pnpm --filter @sigil/contracts coverage
+
+      - name: Enforce Coverage Thresholds
+        run: pnpm --filter @sigil/contracts coverage:check
+
+      - name: Run Core Tests
+        run: pnpm --filter @sigil/core test
+
+      - name: Run Backend Tests
         run: |
           set -euo pipefail
           pnpm --filter @sigil/contracts exec hardhat node --hostname 127.0.0.1 > "$RUNNER_TEMP/hardhat-node.log" 2>&1 &
           node_pid=$!
           cleanup() {
             kill "$node_pid" 2>/dev/null || true
+            pkill -f "hardhat node" 2>/dev/null || true
+            rm -f contracts/deployments/localhost.json
           }
           trap cleanup EXIT
 
@@ -87,14 +103,22 @@ jobs:
             exit 1
           fi
 
-          pnpm test:auth-matrix
-          pnpm -r --if-present test
+          pnpm --filter @sigil/contracts exec hardhat run scripts/deploy.ts --network localhost
 
-      - name: Run Smart Contract Coverage
-        run: pnpm --filter @sigil/contracts coverage
+          CONTRACT_ADDRESS=$(node -p 'require("./contracts/deployments/localhost.json").address')
+          DEPLOY_BLOCK=$(node -p 'require("./contracts/deployments/localhost.json").blockNumber')
 
-      - name: Enforce Coverage Thresholds
-        run: pnpm --filter @sigil/contracts coverage:check
+          mkdir -p "$RUNNER_TEMP/uploads"
+
+          DATABASE_URL="postgresql://localhost:5432/test" \
+          SESSION_SECRET="super-secret-session-key-at-least-32-characters-long" \
+          RPC_URL="http://127.0.0.1:8545" \
+          CHAIN_ID=31337 \
+          CONTRACT_ADDRESS="$CONTRACT_ADDRESS" \
+          DEPLOY_BLOCK="$DEPLOY_BLOCK" \
+          FRONTEND_ORIGIN="http://localhost:5173" \
+          BLOB_DIR="$RUNNER_TEMP/uploads" \
+          pnpm --filter @sigil/backend test
 
       - name: Verify Contract Spec is Up to Date (No Drift)
         run: |
@@ -109,3 +133,4 @@ jobs:
             contracts/coverage/
             contracts/coverage.json
           retention-days: 14
+

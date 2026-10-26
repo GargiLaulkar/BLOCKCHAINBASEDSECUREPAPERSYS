@@ -110,3 +110,12 @@ Backend tests and `node scripts/test-indexer-process.mjs` use the local Hardhat 
 - Reset requires a loopback PostgreSQL host and local Hardhat chain ID 31337, runs Prisma with `--skip-seed`, and does not proceed if DATABASE_URL is absent or remote.
 - Verification claims distinguish completed PostgreSQL reset/startup checks from the JSON-backed process-test adapter used for BE-07.
 - No API, contract or OpenAPI interface was changed.
+
+## CI fixes (BE-13)
+
+- Enforced `* text=auto eol=lf` in `.gitattributes` to eliminate line-ending drift on contract and OpenAPI specs across Windows and Linux checkouts.
+- Added `scripts/export-abi.mjs` to synchronize `ExamVault.json` artifacts and ABI to `@sigil/contracts-types` immediately after `hardhat compile`.
+- Restructured `ci.yml` test steps to run Smart Contract tests, Smart Contract coverage, and Core tests in isolated in-process steps without background node interference.
+- Isolated backend tests with a dedicated ephemeral Hardhat node on `127.0.0.1:8545`, deploying `ExamVault` to `localhost` and dynamically injecting `CONTRACT_ADDRESS`, `DEPLOY_BLOCK`, `RPC_URL`, `CHAIN_ID`, and test database/session parameters into `@sigil/backend test`. Cleaned up the deployment artifact and terminated the node on exit.
+- Preserved `test:auth-matrix` and `test-indexer-process` as opt-in verification suites run separately with their dedicated lifecycle runners.
+
