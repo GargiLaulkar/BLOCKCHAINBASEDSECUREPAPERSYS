@@ -27,6 +27,12 @@ import {
   ExamState,
   TxStatus,
 } from '@sigil/ui';
+import {
+  ConnectWalletGuard,
+  SignInGuard,
+  WrongNetworkGuard,
+  NoRoleGuard,
+} from '../components/guards/GuardScreens';
 
 function ToastButtons() {
   const { showToast } = useToast();
@@ -627,6 +633,55 @@ export function ComponentGallery() {
               onRetry={() => setTxState('preparing')}
               onClose={() => alert('Closed TxDrawer')}
             />
+          </div>
+        </section>
+
+        {/* ============================================================== */}
+        {/* FA-04: GUARD SCREENS PREVIEW                                   */}
+        {/* ============================================================== */}
+        <section id="fa-04-guards">
+          <h2>FA-04: Full-screen guard screens</h2>
+          <p style={{ color: 'var(--sigil-color-slate)' }}>
+            Four security guard states per UI reference: connect wallet, sign in (SIWE), wrong network (alert border), and no role.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginTop: '16px' }}>
+            <div style={{ border: '1px solid var(--sigil-color-hairline)', padding: '16px', background: 'var(--sigil-color-mist)', borderRadius: '3px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--sigil-color-slate)', marginBottom: '8px' }}>
+                1. CONNECT WALLET GUARD
+              </div>
+              <ConnectWalletGuard onConnect={() => alert('Connect requested')} />
+            </div>
+
+            <div style={{ border: '1px solid var(--sigil-color-hairline)', padding: '16px', background: 'var(--sigil-color-mist)', borderRadius: '3px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--sigil-color-slate)', marginBottom: '8px' }}>
+                2. SIGN IN GUARD (SIWE)
+              </div>
+              <SignInGuard
+                account="0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+                onSignIn={() => alert('SIWE requested')}
+              />
+            </div>
+
+            <div style={{ border: '1px solid var(--sigil-color-hairline)', padding: '16px', background: 'var(--sigil-color-mist)', borderRadius: '3px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--sigil-color-slate)', marginBottom: '8px' }}>
+                3. WRONG NETWORK GUARD (ALERT BORDER)
+              </div>
+              <WrongNetworkGuard
+                currentChainId="0x1"
+                onSwitchNetwork={() => alert('Switch network requested')}
+              />
+            </div>
+
+            <div style={{ border: '1px solid var(--sigil-color-hairline)', padding: '16px', background: 'var(--sigil-color-mist)', borderRadius: '3px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--sigil-color-slate)', marginBottom: '8px' }}>
+                4. NO ROLE GUARD
+              </div>
+              <NoRoleGuard
+                account="0x1111111111111111111111111111111111111111"
+                onDisconnect={() => alert('Disconnect requested')}
+              />
+            </div>
           </div>
         </section>
 
