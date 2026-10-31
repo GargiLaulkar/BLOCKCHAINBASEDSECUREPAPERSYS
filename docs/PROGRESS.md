@@ -59,4 +59,7 @@ Current verification (2026-10-18 / 2026-10-19): migration deploy and reset passe
 | FA-01 | Tokens, offline fonts, base CSS, marigold focus ring, prefers-reduced-motion rules, 8px spacing, WCAG AA contrast check | Completed | Verified tokens in `@sigil/ui`, Atkinson fonts offline, contrast table in `/dev/gallery` |
 | FA-02 | Primitive components: Button, Field, FieldError, Select, Dialog, Popover, Tabs, Toast, Tooltip, EmptyState | Completed | Radix UI primitives re-themed for security paper language, keyboard & screen-reader checked |
 | FA-03 | Signature components: CustodyBubbles, Coupon, Rosette (`rosettePath`), Serial, HashChip, ThresholdMeter, CountdownLock, LedgerTable, TxDrawer, StateStamp | Completed | Vitest determinism & snapshot tests pass (5/5); all components rendered in `/dev/gallery` |
+| FA-04 | App shell: top bar, SIWE authentication, MetaMask integration, useAuthGuard, four guard screens, TxDrawer wiring | Completed | Top bar layout matches UI reference, 4 guard screens tested, role-aware nav tested, zero storage of keys |
+| FA-08 | Contract error decoder to plain-language messages without apologies | Completed | Covers all section 7.4 & ExamVault.sol custom errors, unit tests pass (4/4 in frontend) |
+| FA-05 | Admin participants and Authority docket | Blocked | Blocked on Member 5's FB-01 data hooks; exact required hook signatures documented in docs/HANDOFF.md |
 

@@ -123,3 +123,92 @@ Backend tests and `node scripts/test-indexer-process.mjs` use the local Hardhat 
 
 - Added `isValidStoragePath` in `backend/src/routes/exams.ts` to validate stored blob paths before any filesystem calls. Rejects paths that are absolute, contain `..` segments, contain backslashes (`\`), or contain NUL bytes, and enforces separator-aware prefix containment within `BLOB_DIR` returning HTTP 400 `INVALID_STORAGE_PATH`. This resolves a Linux CI failure where `..\outside.bin` was treated as a literal file name on POSIX rather than directory traversal, throwing `ENOENT` during `realpath` and returning 404 `BLOB_NOT_FOUND`.
 - Added test cases in `backend/test/batches.test.ts` verifying rejection with HTTP 400 `INVALID_STORAGE_PATH` for `"../x"`, `"..\\x"`, and absolute paths, while preserving HTTP 404 `BLOB_NOT_FOUND` for genuinely missing files.
+
+
+---
+
+# Member 4 Handoff (Frontend A & Design System)
+
+## Current Status
+
+- **Tasks Completed**:
+  - `FA-01`: Tokens, offline fonts, base CSS, focus ring, prefers-reduced-motion, 8px spacing, and WCAG AA contrast check table in `/dev/gallery`.
+  - `FA-02`: Primitive components: `Button`, `Field`, `FieldError`, `Select`, `Dialog`, `Popover`, `Tabs`, `Toast`, `Tooltip`, `EmptyState` fully re-themed for security paper language.
+  - `FA-03`: Signature security-paper components: `CustodyBubbles` (horizontal strip & inline), `Coupon`, `Rosette` (`rosettePath` deterministic hypotrochoid with snapshot test), `Serial`, `HashChip`, `ThresholdMeter`, `CountdownLock`, `LedgerTable`, `TxDrawer`, `StateStamp`.
+  - `FA-08`: Contract error decoder mapping every custom error from section 7.4 and `ExamVault.sol` lines 73-96 to plain-language messages without apologies, with unit test coverage.
+  - `FA-04`: App shell (top bar layout matching approved UI reference), MetaMask wallet connection, Sign-In With Ethereum (SIWE) authentication via `/api/auth/nonce` and `/api/auth/verify`, `useAuthGuard` hook, four full-screen guard screens (`ConnectWalletGuard`, `SignInGuard`, `WrongNetworkGuard`, `NoRoleGuard`), and `TxDrawer` lifecycle integration.
+
+- **Blocked Task**:
+  - `FA-05`: Admin participants table and Authority exam docket. Blocked because Member 5's FB-01 data hooks have not been delivered yet.
+
+## Required FB-01 Hooks from Member 5 for FA-05
+
+To complete `FA-05` without mocking or violating the "no dummy data" rule, Member 4 requires the following hooks and signatures from Member 5 (`FB-01`):
+
+### 1. Participant Registry Hooks
+
+```typescript
+export interface ParticipantItem {
+  account: string;           // Checksummed EVM address
+  roles: number[];          // Role enum indices (0=ADMIN, 1=AUTHORITY, 2=SETTER, 3=HOLDER, 4=CENTRE, 5=AUDITOR)
+  profileHash?: string;     // bytes32 hash of profile metadata
+  displayName?: string;     // Off-chain profile display name
+  organisation?: string;    // Off-chain organisation
+  encryptionKey?: string;   // 65-byte uncompressed P-256 public key (if HOLDER)
+  liveExamCount?: number;   // Active exams counter preventing premature role revocation
+}
+
+export function useParticipants(roleFilter?: number): {
+  participants: ParticipantItem[];
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+};
+
+export function useRegisterParticipant(): {
+  registerParticipant: (account: string, role: number, profileHash?: string) => Promise<string>; // Returns txHash
+  isPending: boolean;
+  error: Error | null;
+};
+
+export function useRevokeParticipant(): {
+  revokeParticipant: (account: string, role: number) => Promise<string>; // Returns txHash
+  isPending: boolean;
+  error: Error | null;
+};
+```
+
+### 2. Examination Docket Hooks
+
+```typescript
+export interface ExamDocketItem {
+  id: bigint;
+  title: string;
+  state: ExamState;         // 0=Draft, 1=Collecting, 2=Sealed, 3=Released, 4=Concluded, 5=Cancelled
+  authority: string;
+  metaHash: string;
+  releaseOpensAt: bigint;   // Unix timestamp (seconds)
+  examStartsAt: bigint;     // Unix timestamp (seconds)
+  examEndsAt: bigint;       // Unix timestamp (seconds)
+  threshold: number;
+  holderCount: number;
+  bankHash: string;
+  seed: string;
+  quotas: number[];
+}
+
+export function useExams(): {
+  exams: ExamDocketItem[];
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+};
+
+export function useExamPanel(examId: bigint): {
+  holders: string[];
+  setters: string[];
+  centres: string[];
+  isLoading: boolean;
+  error: Error | null;
+};
+```
