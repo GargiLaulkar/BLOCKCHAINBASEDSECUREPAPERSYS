@@ -15,7 +15,7 @@ export interface DecodedContractError {
 
 const contractInterface: Interface = new Interface(ExamVaultABI);
 
-const STATE_NAMES: Record<number, string> = {
+export const STATE_NAMES: Record<number, string> = {
   0: 'Draft',
   1: 'Collecting',
   2: 'Sealed',
@@ -24,28 +24,55 @@ const STATE_NAMES: Record<number, string> = {
   5: 'Cancelled',
 };
 
-const ERROR_MAP: Record<string, (args?: any) => { message: string; action: string }> = {
+export const ERROR_MAP: Record<string, (args?: any) => { message: string; action: string }> = {
   NotAssigned: () => ({
     message: 'Your account is not assigned to this examination panel or role.',
     action: 'Verify your connected wallet address or contact the Exam Authority.',
   }),
   WrongState: (args) => {
-    const expected = args?.expected !== undefined ? (STATE_NAMES[Number(args.expected)] ?? String(args.expected)) : 'required';
-    const actual = args?.actual !== undefined ? (STATE_NAMES[Number(args.actual)] ?? String(args.actual)) : 'current';
+    const rawExpected = args?.expected ?? args?.[0];
+    const rawActual = args?.actual ?? args?.[1];
+    const expected = rawExpected !== undefined
+      ? (STATE_NAMES[Number(rawExpected)] ?? String(rawExpected))
+      : 'the required';
+    const actual = rawActual !== undefined
+      ? (STATE_NAMES[Number(rawActual)] ?? String(rawActual))
+      : 'the current';
     return {
-      message: `The exam is in the wrong lifecycle state for this operation (expected ${expected}, but actual is ${actual}).`,
+      message: `The exam is in the wrong lifecycle state: expected ${expected}, but actual is ${actual}.`,
       action: 'Wait for the required state transition before retrying.',
     };
   },
   TooEarly: (args) => {
+    const rawNow = args?.nowTime ?? args?.[0];
+    const rawAllowed = args?.allowedFrom ?? args?.[1];
+    let timing = '';
+    if (rawNow !== undefined && rawAllowed !== undefined) {
+      const now = Number(rawNow);
+      const allowed = Number(rawAllowed);
+      const diff = allowed - now;
+      if (diff > 0) {
+        timing = ` Current chain time is ${now}; window opens at ${allowed} (in ${diff} seconds).`;
+      } else {
+        timing = ` Current chain time is ${now}; window opens at ${allowed}.`;
+      }
+    }
     return {
-      message: 'The scheduled time window for this action has not opened yet.',
+      message: `The scheduled time window for this action has not opened yet.${timing}`,
       action: 'Check the countdown clock and submit once the window opens.',
     };
   },
   TooLate: (args) => {
+    const rawNow = args?.nowTime ?? args?.[0];
+    const rawAllowed = args?.allowedUntil ?? args?.[1];
+    let timing = '';
+    if (rawNow !== undefined && rawAllowed !== undefined) {
+      const now = Number(rawNow);
+      const allowed = Number(rawAllowed);
+      timing = ` Current chain time is ${now}, but the deadline was ${allowed}.`;
+    }
     return {
-      message: 'The deadline for this on-chain action has passed.',
+      message: `The deadline for this on-chain action has passed.${timing}`,
       action: 'Check the exam schedule; no further submissions can be accepted.',
     };
   },
@@ -54,7 +81,7 @@ const ERROR_MAP: Record<string, (args?: any) => { message: string; action: strin
     action: 'Ensure release opens after the lead time and precedes exam start and end.',
   }),
   InvalidThreshold: () => ({
-    message: 'The key threshold must be a strict majority of key holders (t > n/2) and within allowed limits.',
+    message: 'The key threshold must be a strict majority of key holders and within allowed limits.',
     action: 'Adjust the threshold count to meet the majority requirement.',
   }),
   InvalidPanel: () => ({
@@ -67,7 +94,7 @@ const ERROR_MAP: Record<string, (args?: any) => { message: string; action: strin
   }),
   InvalidKeyFormat: () => ({
     message: 'The public encryption key format is invalid.',
-    action: 'Ensure the key is an uncompressed P-256 public key (65 bytes with prefix 0x04).',
+    action: 'Ensure the key is an uncompressed P-256 public key (65 bytes with valid prefix).',
   }),
   InvalidShare: () => ({
     message: 'The submitted decryption share does not match the commitment recorded during key ceremony.',
@@ -82,18 +109,41 @@ const ERROR_MAP: Record<string, (args?: any) => { message: string; action: strin
     action: 'No further action needed; multiple submissions are rejected.',
   }),
   QuotaNotMet: (args) => {
-    const sec = args?.sectionId !== undefined ? Number(args.sectionId) : 'designated';
-    const have = args?.have !== undefined ? Number(args.have) : '?';
-    const need = args?.need !== undefined ? Number(args.need) : '?';
+    const rawSection = args?.sectionName ?? args?.sectionId ?? args?.[0];
+    const rawHave = args?.have ?? args?.[1];
+    const rawNeed = args?.need ?? args?.[2];
+
+    const have = rawHave !== undefined ? Number(rawHave) : undefined;
+    const need = rawNeed !== undefined ? Number(rawNeed) : undefined;
+
+    let sectionLabel = '';
+    if (rawSection !== undefined) {
+      const s = String(rawSection);
+      sectionLabel = isNaN(Number(s)) ? `${s} ` : `section ${s} `;
+    }
+
+    const countInfo = (have !== undefined && need !== undefined)
+      ? `Seal needs ${need} ${sectionLabel}questions; the bank has ${have}.`
+      : `Question quota for ${sectionLabel || 'the designated section '}has not been met.`;
+
     return {
-      message: `Question quota for section ${sec} has not been met (${have} of ${need} questions submitted).`,
+      message: countInfo.replace(/\s+/g, ' ').replace(' ;', ';'),
       action: 'Collect and submit all required question batches before sealing the exam.',
     };
   },
   MissingCommitment: (args) => {
-    const holder = args?.holder ? ` for holder ${args.holder}` : '';
+    const rawHolder = args?.holder ?? args?.[0];
+    let holderDetail = '';
+    if (rawHolder) {
+      const h = String(rawHolder);
+      if (h.startsWith('0x')) {
+        holderDetail = ` for key holder account ending in ...${h.slice(-4)}`;
+      } else {
+        holderDetail = ` for ${h}`;
+      }
+    }
     return {
-      message: `A key holder commitment is missing${holder}.`,
+      message: `A key holder commitment is missing${holderDetail}.`,
       action: 'Wait for all assigned key holders to submit commitments before sealing.',
     };
   },
@@ -106,7 +156,8 @@ const ERROR_MAP: Record<string, (args?: any) => { message: string; action: strin
     action: 'Conclude or cancel live exams before revoking roles or updating keys.',
   }),
   InvalidRole: (args) => {
-    const roleId = args?.role !== undefined ? ` (role ID: ${args.role})` : '';
+    const rawRole = args?.role ?? args?.[0];
+    const roleId = rawRole !== undefined ? ` (role index ${rawRole})` : '';
     return {
       message: `The specified participant role identifier is invalid${roleId}.`,
       action: 'Select a valid role from the participant management interface.',
@@ -133,15 +184,24 @@ const ERROR_MAP: Record<string, (args?: any) => { message: string; action: strin
     action: 'Check question bank decryption and re-run deterministic variant selection.',
   }),
   AccessControlUnauthorizedAccount: (args) => {
-    const acc = args?.account ? ` Account ${args.account}` : 'Your account';
+    const rawAccount = args?.account ?? args?.[0];
+    let acc = 'Your account';
+    if (rawAccount) {
+      const a = String(rawAccount);
+      acc = a.startsWith('0x') ? `Account ending in ...${a.slice(-4)}` : `Account ${a}`;
+    }
     return {
       message: `${acc} lacks the required smart contract authorization for this call.`,
       action: 'Switch to an account authorized with the appropriate role.',
     };
   },
+  AccessControlBadConfirmation: () => ({
+    message: 'The role confirmation parameters do not match the target account.',
+    action: 'Verify the participant account and role confirmation before retrying.',
+  }),
 };
 
-const FALLBACK_ERROR: DecodedContractError = {
+export const FALLBACK_ERROR: DecodedContractError = {
   name: 'UnknownError',
   message: 'An unexpected transaction error occurred.',
   action: 'Verify your wallet network connection, balance, and transaction parameters.',
@@ -209,6 +269,10 @@ export function decodeContractError(error: unknown): DecodedContractError {
           parsedArgs = { sectionId: parts[0], have: parts[1], need: parts[2] };
         } else if (errorName === 'WrongState') {
           parsedArgs = { expected: parts[0], actual: parts[1] };
+        } else if (errorName === 'TooEarly') {
+          parsedArgs = { nowTime: parts[0], allowedFrom: parts[1] };
+        } else if (errorName === 'TooLate') {
+          parsedArgs = { nowTime: parts[0], allowedUntil: parts[1] };
         } else if (errorName === 'MissingCommitment') {
           parsedArgs = { holder: parts[0] };
         } else if (errorName === 'InvalidRole') {
