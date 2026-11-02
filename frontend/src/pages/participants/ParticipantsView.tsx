@@ -10,8 +10,8 @@ import {
   HashChip,
   EmptyState,
 } from '@sigil/ui';
-import { ParticipantRecord, ParticipantRole, PARTICIPANT_ROLES } from '../../hooks/useParticipants';
 import { ethers } from 'ethers';
+import { PARTICIPANT_ROLES, ParticipantRecord, ParticipantRole } from './types';
 
 export interface ParticipantsViewProps {
   participants: ParticipantRecord[];
@@ -338,6 +338,7 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
               key={r}
               type="button"
               onClick={() => onRoleFilterChange(r)}
+              aria-pressed={isActive}
               style={{
                 border: '1px solid',
                 borderColor: isActive ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
@@ -357,10 +358,16 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
         })}
       </div>
 
-      {/* Table or Empty State */}
-      {filteredParticipants.length === 0 ? (
+      {error && participants.length > 0 && (
+        <p role="alert" style={{ color: 'var(--sigil-color-alert)', margin: '0 0 16px' }}>
+          Participant data may be out of date: {typeof error === 'string' ? error : error.message}
+        </p>
+      )}
+
+      {/* EmptyState is reserved for an actually empty participant registry. */}
+      {participants.length === 0 ? (
         <EmptyState
-          title={roleFilter === 'ALL' ? 'No participants registered' : `No ${roleFilter.toLowerCase()}s found`}
+          title="No participants registered"
           description="Register examiners, key holders, and examination centres to begin setting up exams."
           action={
             <Button variant="primary" onClick={handleOpenRegister}>
@@ -368,6 +375,15 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
             </Button>
           }
         />
+      ) : filteredParticipants.length === 0 ? (
+        <div role="status" style={{ borderTop: '1px solid var(--sigil-color-hairline)', padding: '20px 0' }}>
+          <p style={{ margin: '0 0 12px', color: 'var(--sigil-color-slate)' }}>
+            No participants match the {roleFilter} role filter.
+          </p>
+          <Button variant="secondary" onClick={() => onRoleFilterChange('ALL')}>
+            Clear role filter
+          </Button>
+        </div>
       ) : (
         <LedgerTable
           caption="Registered participants and their active roles"
@@ -393,6 +409,7 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
               setFormAddress(e.target.value);
               if (addressError) setAddressError(validateAddress(e.target.value));
             }}
+            onBlur={() => setAddressError(validateAddress(formAddress))}
             error={addressError ?? undefined}
             mono
             disabled={isRegistering}
@@ -418,6 +435,7 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
               setFormProfileHash(e.target.value);
               if (hashError) setHashError(validateProfileHash(e.target.value));
             }}
+            onBlur={() => setHashError(validateProfileHash(formProfileHash))}
             error={hashError ?? undefined}
             mono
             disabled={isRegistering}

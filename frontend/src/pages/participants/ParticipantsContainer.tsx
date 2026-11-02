@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   useParticipants,
   useRegisterParticipant,
   useRevokeParticipant,
-  ParticipantRole,
+} from '../../hooks/useParticipants';
+import type {
+  ParticipantRegistrationInput,
   ParticipantRegistryContract,
+  ParticipantRevocationInput,
+  ParticipantRole,
 } from '../../hooks/useParticipants';
 import { useExamVaultContract } from '../../contracts/useExamVaultContract';
 import { useTransaction } from '../../shell/AppShell';
@@ -14,58 +18,101 @@ import { ParticipantsView } from './ParticipantsView';
 
 export const ParticipantsContainer: React.FC = () => {
   const guard = useAuthGuard(['ADMIN']);
-  const rawContract = useExamVaultContract();
-  const contract = rawContract as unknown as ParticipantRegistryContract | null;
+  const contractState = useExamVaultContract();
+  const rawContract = contractState.contract;
   const tx = useTransaction();
-
+  const submittedTransactionHash = useRef<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<ParticipantRole | 'ALL'>('ALL');
+  const [refreshError, setRefreshError] = useState<Error | null>(null);
 
-  // Hooks from Member 5
   const { participants, isLoading, error, refetch } = useParticipants({ enabled: guard.isAuthorized });
+  const contract = useMemo<ParticipantRegistryContract | null>(() => {
+    if (!rawContract) {
+      return null;
+    }
+
+    return {
+      registerParticipant: async (account, role, profileHash) => {
+        const response = await rawContract.getFunction('registerParticipant')(account, role, profileHash);
+        submittedTransactionHash.current = response.hash;
+        tx.setTxPending(response.hash);
+        return response;
+      },
+      revokeParticipant: async (account, role) => {
+        const response = await rawContract.getFunction('revokeParticipant')(account, role);
+        submittedTransactionHash.current = response.hash;
+        tx.setTxPending(response.hash);
+        return response;
+      },
+    };
+  }, [rawContract, tx.setTxPending]);
+
   const registerMutation = useRegisterParticipant({ contract });
   const revokeMutation = useRevokeParticipant({ contract });
 
-  // Handle register participant
-  const handleRegister = async (input: { address: string; role: ParticipantRole; profileHash?: string | null }) => {
+  const refreshParticipants = useCallback(async () => {
+    setRefreshError(null);
     try {
-      tx.startTx(`Registering participant as ${input.role}`);
-      tx.setTxAwaitingSignature();
-
-      const res = await registerMutation.mutate(input);
-      // If mutation completes, it was confirmed on chain
-      tx.setTxConfirmed(res.address);
       await refetch();
-    } catch (err: any) {
-      const decoded = decodeContractError(err);
+    } catch (error) {
+      setRefreshError(error instanceof Error ? error : new Error('Failed to refresh participant data.'));
+    }
+  }, [refetch]);
+
+  const handleMutationError = (error: unknown, title: string) => {
+    const decoded = decodeContractError(error);
+    if (submittedTransactionHash.current) {
       tx.setTxFailed(decoded.formatted);
-      throw err;
+    } else {
+      tx.setActiveTx({ status: 'failed', title, errorMessage: decoded.formatted });
     }
   };
 
-  // Handle revoke participant
-  const handleRevoke = async (input: { address: string; role: ParticipantRole }) => {
+  const handleRegister = async (input: ParticipantRegistrationInput) => {
+    submittedTransactionHash.current = null;
+    const title = `Registering participant as ${input.role}`;
+    tx.startTx(title);
+    tx.setTxAwaitingSignature();
     try {
-      tx.startTx(`Revoking ${input.role} role`);
-      tx.setTxAwaitingSignature();
-
-      const res = await revokeMutation.mutate(input);
-      tx.setTxConfirmed(res.address);
-      await refetch();
-    } catch (err: any) {
-      const decoded = decodeContractError(err);
-      tx.setTxFailed(decoded.formatted);
-      throw err;
+      await registerMutation.mutate(input);
+      const transactionHash = submittedTransactionHash.current;
+      if (!transactionHash) {
+        throw new Error('The wallet did not return a registration transaction hash.');
+      }
+      tx.setTxConfirmed(transactionHash);
+    } catch (error) {
+      handleMutationError(error, title);
+      throw error;
     }
+    await refreshParticipants();
   };
 
-  // If role is denied, show permissionDenied
+  const handleRevoke = async (input: ParticipantRevocationInput) => {
+    submittedTransactionHash.current = null;
+    const title = `Revoking ${input.role} role`;
+    tx.startTx(title);
+    tx.setTxAwaitingSignature();
+    try {
+      await revokeMutation.mutate(input);
+      const transactionHash = submittedTransactionHash.current;
+      if (!transactionHash) {
+        throw new Error('The wallet did not return a revocation transaction hash.');
+      }
+      tx.setTxConfirmed(transactionHash);
+    } catch (error) {
+      handleMutationError(error, title);
+      throw error;
+    }
+    await refreshParticipants();
+  };
+
   const isPermissionDenied = guard.guardState === 'no-role';
 
   return (
     <ParticipantsView
       participants={participants}
-      isLoading={isLoading}
-      error={error}
+      isLoading={isLoading || (guard.isAuthorized && contractState.isLoading)}
+      error={error ?? refreshError ?? contractState.error}
       permissionDenied={isPermissionDenied}
       roleFilter={roleFilter}
       onRoleFilterChange={setRoleFilter}
@@ -73,7 +120,7 @@ export const ParticipantsContainer: React.FC = () => {
       onRevoke={handleRevoke}
       isRegistering={registerMutation.isPending}
       isRevoking={revokeMutation.isPending}
-      onRetry={() => refetch()}
+      onRetry={() => void refreshParticipants()}
     />
   );
 };

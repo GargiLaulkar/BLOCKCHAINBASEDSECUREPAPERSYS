@@ -6,8 +6,13 @@ import {
   validateAddress,
   validateProfileHash,
 } from '../src/pages/participants/ParticipantsView';
-import { ParticipantRecord } from '../src/hooks/useParticipants';
+import { ParticipantRecord } from '../src/pages/participants/types';
 import { decodeContractError } from '../src/utils/errors';
+
+Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+  configurable: true,
+  value: vi.fn(),
+});
 
 describe('FA-05: Admin Participants Component Tests', () => {
   const sampleParticipants: ParticipantRecord[] = [
@@ -137,6 +142,21 @@ describe('FA-05: Admin Participants Component Tests', () => {
     expect(screen.queryByText('Custodian Alistair')).not.toBeInTheDocument();
   });
 
+  it('does not present a truly empty registry when a role filter has no matches', () => {
+    render(
+      <ParticipantsView
+        participants={sampleParticipants}
+        roleFilter="CENTRE"
+        onRoleFilterChange={() => {}}
+        onRegister={async () => {}}
+        onRevoke={async () => {}}
+      />
+    );
+
+    expect(screen.getByText('No participants match the CENTRE role filter.')).toBeInTheDocument();
+    expect(screen.queryByText('No participants registered')).not.toBeInTheDocument();
+  });
+
   describe('Address Validation per Section 11', () => {
     it('rejects empty address', () => {
       expect(validateAddress('')).toBe('Ethereum address is required.');
@@ -185,23 +205,49 @@ describe('FA-05: Admin Participants Component Tests', () => {
     const openBtn = screen.getByRole('button', { name: /register participant/i });
     fireEvent.click(openBtn);
 
-    expect(screen.getByText('Assign an Ethereum address to an on-chain examination role.')).toBeInTheDocument();
+    expect(screen.getByText(/Assign an Ethereum address to an on-chain examination role/)).toBeInTheDocument();
 
     // Fill valid address
     const addressInput = screen.getByLabelText(/ethereum account address/i);
     fireEvent.change(addressInput, { target: { value: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65' } });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: /assigned role/i }), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Holder' }));
+    fireEvent.change(screen.getByLabelText(/profile metadata hash/i), {
+      target: { value: `0x${'a'.repeat(64)}` },
+    });
 
     // Submit form
-    const submitBtn = screen.getByRole('button', { name: /sign & register/i });
-    fireEvent.click(submitBtn);
+    fireEvent.click(screen.getByRole('button', { name: /sign & register/i }));
 
     await waitFor(() => {
       expect(registerFn).toHaveBeenCalledWith({
         address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
-        role: 'AUTHORITY',
-        profileHash: null,
+        role: 'HOLDER',
+        profileHash: `0x${'a'.repeat(64)}`,
       });
     });
+  });
+
+  it('shows inline address validation on blur and blocks an invalid registration', async () => {
+    const registerFn = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ParticipantsView
+        participants={sampleParticipants}
+        roleFilter="ALL"
+        onRoleFilterChange={() => {}}
+        onRegister={registerFn}
+        onRevoke={async () => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /register participant/i }));
+    const addressInput = screen.getByLabelText(/ethereum account address/i);
+    fireEvent.change(addressInput, { target: { value: '0xinvalid' } });
+    fireEvent.blur(addressInput);
+    expect(screen.getByText(/Invalid Ethereum address format/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /sign & register/i }));
+    expect(registerFn).not.toHaveBeenCalled();
   });
 
   it('handles revoke confirmation Coupon dialog', async () => {

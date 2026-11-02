@@ -138,77 +138,13 @@ Backend tests and `node scripts/test-indexer-process.mjs` use the local Hardhat 
   - `FA-08`: Contract error decoder mapping every custom error from section 7.4 and `ExamVault.sol` lines 73-96 to plain-language messages without apologies, with unit test coverage.
   - `FA-04`: App shell (top bar layout matching approved UI reference), MetaMask wallet connection, Sign-In With Ethereum (SIWE) authentication via `/api/auth/nonce` and `/api/auth/verify`, `useAuthGuard` hook, four full-screen guard screens (`ConnectWalletGuard`, `SignInGuard`, `WrongNetworkGuard`, `NoRoleGuard`), and `TxDrawer` lifecycle integration.
 
-- **Blocked Task**:
-  - `FA-05`: Admin participants table and Authority exam docket. Blocked because Member 5's FB-01 data hooks have not been delivered yet.
+- **FA-05**: Implemented on top of the merged FB-01 hooks. Admin participants and Authority docket routes are live-data pages; no FA-05 code changes the Member 5 hook files.
 
-## Required FB-01 Hooks from Member 5 for FA-05
+## FA-05 implementation and handoff
 
-To complete `FA-05` without mocking or violating the "no dummy data" rule, Member 4 requires the following hooks and signatures from Member 5 (`FB-01`):
-
-### 1. Participant Registry Hooks
-
-```typescript
-export interface ParticipantItem {
-  account: string;           // Checksummed EVM address
-  roles: number[];          // Role enum indices (0=ADMIN, 1=AUTHORITY, 2=SETTER, 3=HOLDER, 4=CENTRE, 5=AUDITOR)
-  profileHash?: string;     // bytes32 hash of profile metadata
-  displayName?: string;     // Off-chain profile display name
-  organisation?: string;    // Off-chain organisation
-  encryptionKey?: string;   // 65-byte uncompressed P-256 public key (if HOLDER)
-  liveExamCount?: number;   // Active exams counter preventing premature role revocation
-}
-
-export function useParticipants(roleFilter?: number): {
-  participants: ParticipantItem[];
-  isLoading: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-};
-
-export function useRegisterParticipant(): {
-  registerParticipant: (account: string, role: number, profileHash?: string) => Promise<string>; // Returns txHash
-  isPending: boolean;
-  error: Error | null;
-};
-
-export function useRevokeParticipant(): {
-  revokeParticipant: (account: string, role: number) => Promise<string>; // Returns txHash
-  isPending: boolean;
-  error: Error | null;
-};
-```
-
-### 2. Examination Docket Hooks
-
-```typescript
-export interface ExamDocketItem {
-  id: bigint;
-  title: string;
-  state: ExamState;         // 0=Draft, 1=Collecting, 2=Sealed, 3=Released, 4=Concluded, 5=Cancelled
-  authority: string;
-  metaHash: string;
-  releaseOpensAt: bigint;   // Unix timestamp (seconds)
-  examStartsAt: bigint;     // Unix timestamp (seconds)
-  examEndsAt: bigint;       // Unix timestamp (seconds)
-  threshold: number;
-  holderCount: number;
-  bankHash: string;
-  seed: string;
-  quotas: number[];
-}
-
-export function useExams(): {
-  exams: ExamDocketItem[];
-  isLoading: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-};
-
-export function useExamPanel(examId: bigint): {
-  holders: string[];
-  setters: string[];
-  centres: string[];
-  isLoading: boolean;
-  error: Error | null;
-};
-```
+- Participants use `useParticipants({ enabled })`, `useRegisterParticipant({ contract })`, and `useRevokeParticipant({ contract })` with the actual `ParticipantRecord` and mutation input types. The wallet adapter tracks the returned transaction hash so the shared `TxDrawer` shows awaiting-signature, pending, confirmed, or decoded failure.
+- The participant registry reads events through FB-01, includes role filtering and profile hashes, validates/checksums addresses and validates optional bytes32 profile hashes. Revoke uses the permanent-action Coupon. A `HolderInLiveExam` revert is displayed through the FA-08 plain-language decoder; the contract remains authoritative because FB-01 does not expose a live-exam counter.
+- The docket uses `useExams()` for live summaries and `useExamPanel(examId, { contract })` for the actual holder count. It gets titles from the existing authenticated `GET /api/exams/{id}` detail endpoint (`metaJson.title`) using the generated OpenAPI path type. Missing metadata is displayed as “Title unavailable”; the page does not fabricate a title.
+- `/participants`, `/admin/participants`, `/docket`, and `/authority/docket` render the corresponding pages. The docket Create exam action follows the shell’s `/authority/create` wizard route.
+- Sample page-state records exist only in the `/dev/gallery` section and test code. No sample data is used on operational routes.
+- The FB-01 signatures in the earlier handoff sketch were superseded by Member 5’s merged implementation. No Member 5 change is currently requested: title and holder count are available from the API detail route and `useExamPanel`, respectively. If an exam’s backend detail has no `metaJson.title`, its exact missing source is persisted exam metadata; the UI reports that absence rather than inventing a value.

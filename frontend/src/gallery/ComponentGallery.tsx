@@ -35,8 +35,8 @@ import {
 } from '../components/guards/GuardScreens';
 import { ParticipantsView } from '../pages/participants/ParticipantsView';
 import { DocketView } from '../pages/docket/DocketView';
-import { ParticipantRecord, ParticipantRole } from '../hooks/useParticipants';
-import { ExamSummary } from '../hooks/useExams';
+import { ParticipantRecord, ParticipantRole } from '../pages/participants/types';
+import { DocketExam } from '../pages/docket/types';
 
 function ToastButtons() {
   const { showToast } = useToast();
@@ -130,9 +130,10 @@ export function ComponentGallery() {
     },
   ];
 
-  const gallerySampleExams: ExamSummary[] = [
+  const gallerySampleExams: DocketExam[] = [
     {
       examId: '7',
+      serialSort: '7'.padStart(78, '0'),
       chainId: 31337,
       state: 1, // Collecting
       metaHash: '0x8f2d591c0e7b4a2e6f3d1a8c5b7e9f0a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e',
@@ -142,10 +143,12 @@ export function ComponentGallery() {
       threshold: 3,
       bankHash: null,
       seed: null,
-      ...({ title: 'Higher Secondary Physics 2026' } as any),
+      title: 'Higher Secondary Physics 2026',
+      holderCount: 5,
     },
     {
       examId: '8',
+      serialSort: '8'.padStart(78, '0'),
       chainId: 31337,
       state: 2, // Sealed
       metaHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
@@ -155,10 +158,12 @@ export function ComponentGallery() {
       threshold: 3,
       bankHash: '0x5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b',
       seed: null,
-      ...({ title: 'Organic Chemistry & Biochemistry Paper 1' } as any),
+      title: 'Organic Chemistry & Biochemistry Paper 1',
+      holderCount: 5,
     },
     {
       examId: '9',
+      serialSort: '9'.padStart(78, '0'),
       chainId: 31337,
       state: 3, // Released
       metaHash: '0x9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f',
@@ -168,10 +173,12 @@ export function ComponentGallery() {
       threshold: 4,
       bankHash: '0x4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c',
       seed: '0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b',
-      ...({ title: 'Pure Mathematics & Linear Algebra' } as any),
+      title: 'Pure Mathematics & Linear Algebra',
+      holderCount: 5,
     },
     {
       examId: '10',
+      serialSort: '10'.padStart(78, '0'),
       chainId: 31337,
       state: 4, // Concluded
       metaHash: '0x3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d',
@@ -181,7 +188,8 @@ export function ComponentGallery() {
       threshold: 3,
       bankHash: '0x2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e',
       seed: '0x6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c',
-      ...({ title: 'Computer Science & Algorithmics 2026' } as any),
+      title: 'Computer Science & Algorithmics 2026',
+      holderCount: 5,
     },
   ];
 
@@ -904,7 +912,6 @@ export function ComponentGallery() {
                 onCreateExam={() => alert('Navigate to Create Exam wizard')}
                 onRowClick={(e) => alert(`Selected exam #${e.examId}`)}
                 onRetry={() => setDocketState('populated')}
-                panelHolders={{ '7': 5, '8': 5, '9': 5, '10': 5 }}
               />
             </div>
           </div>

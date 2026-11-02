@@ -8,10 +8,10 @@ import {
   EmptyState,
   ExamState as CustodyExamState,
 } from '@sigil/ui';
-import { ExamSummary } from '../../hooks/useExams';
+import { DocketExam } from './types';
 
 export interface DocketViewProps {
-  exams: ExamSummary[];
+  exams: DocketExam[];
   isLoading?: boolean;
   error?: Error | string | null;
   permissionDenied?: boolean;
@@ -20,9 +20,8 @@ export interface DocketViewProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onCreateExam?: () => void;
-  onRowClick?: (exam: ExamSummary) => void;
+  onRowClick?: (exam: DocketExam) => void;
   onRetry?: () => void;
-  panelHolders?: Record<string, number>;
 }
 
 export const STATE_INT_MAP: Record<number, CustodyExamState> = {
@@ -59,21 +58,17 @@ export const DocketView: React.FC<DocketViewProps> = ({
   onCreateExam,
   onRowClick,
   onRetry,
-  panelHolders = {},
 }) => {
-  // Filtered & searched data
   const filteredExams = React.useMemo(() => {
     return exams.filter((e) => {
-      // 1. State filter
       if (stateFilter !== 'ALL') {
-        const stateName = STATE_INT_MAP[e.state] ?? String(e.state);
+        const stateName = STATE_INT_MAP[e.state] ?? 'Unknown';
         if (stateName.toLowerCase() !== stateFilter.toLowerCase()) return false;
       }
-      // 2. Search query (examId, title, or metaHash)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const serialStr = String(e.examId).padStart(4, '0');
-        const title = ((e as any).title ?? (e as any).metaJson?.title ?? '').toLowerCase();
+        const title = e.title?.toLowerCase() ?? '';
         const meta = (e.metaHash ?? '').toLowerCase();
         if (!serialStr.includes(q) && !title.includes(q) && !meta.includes(q)) {
           return false;
@@ -83,10 +78,9 @@ export const DocketView: React.FC<DocketViewProps> = ({
     });
   }, [exams, stateFilter, searchQuery]);
 
-  // Columns definition
-  const columns: Column<ExamSummary>[] = [
+  const columns: Column<DocketExam>[] = [
     {
-      key: 'examId',
+      key: 'serialSort',
       header: 'Serial',
       sortable: true,
       render: (row) => (
@@ -100,14 +94,13 @@ export const DocketView: React.FC<DocketViewProps> = ({
       header: 'Examination Title',
       sortable: true,
       render: (row) => {
-        const title = (row as any).title ?? (row as any).metaJson?.title ?? `Examination No. ${String(row.examId).padStart(4, '0')}`;
         return (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontWeight: 600, color: 'var(--sigil-color-ink)', fontSize: '13px' }}>
-              {title}
+              {row.title ?? 'Title unavailable'}
             </span>
             <span style={{ fontSize: '11px', color: 'var(--sigil-color-slate)', fontFamily: 'var(--sigil-font-mono)' }}>
-              Chain #{row.chainId} · Hash {row.metaHash?.slice(0, 10)}...
+              Chain #{row.chainId} · Hash {row.metaHash.slice(0, 10)}...
             </span>
           </div>
         );
@@ -118,7 +111,10 @@ export const DocketView: React.FC<DocketViewProps> = ({
       header: 'Custody State',
       sortable: true,
       render: (row) => {
-        const stateName = STATE_INT_MAP[row.state] ?? 'Draft';
+        const stateName = STATE_INT_MAP[row.state];
+        if (!stateName) {
+          return <span role="status">Unknown custody state ({row.state})</span>;
+        }
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CustodyBubbles currentState={stateName} variant="inline" />
@@ -139,7 +135,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
     },
     {
       key: 'releaseOpensAt',
-      header: 'Release Window',
+      header: 'Release time',
       sortable: true,
       render: (row) => (
         <span style={{ fontSize: '12px', fontFamily: 'var(--sigil-font-mono)', color: 'var(--sigil-color-ink)' }}>
@@ -149,11 +145,9 @@ export const DocketView: React.FC<DocketViewProps> = ({
     },
     {
       key: 'threshold',
-      header: 'Panel (Holders)',
+      header: 'Panel',
       sortable: true,
       render: (row) => {
-        const holdersCount = panelHolders[row.examId] ?? (row as any).holderCount;
-        const panelText = holdersCount ? `${row.threshold} of ${holdersCount}` : `${row.threshold} required`;
         return (
           <span
             style={{
@@ -163,7 +157,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
               color: 'var(--sigil-color-ink)',
             }}
           >
-            {panelText}
+            {row.threshold} of {row.holderCount}
           </span>
         );
       },
@@ -196,7 +190,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
   }
 
   // 2. Loading Skeleton State
-  if (isLoading && exams.length === 0) {
+  if (isLoading) {
     return (
       <div className="sigil-page-container" style={{ padding: '32px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -265,7 +259,6 @@ export const DocketView: React.FC<DocketViewProps> = ({
 
   return (
     <div className="sigil-page-container" style={{ padding: '32px 0', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--sigil-color-ink)' }}>
@@ -282,7 +275,6 @@ export const DocketView: React.FC<DocketViewProps> = ({
         )}
       </div>
 
-      {/* Filter and Search Bar */}
       <div
         style={{
           display: 'flex',
@@ -295,7 +287,6 @@ export const DocketView: React.FC<DocketViewProps> = ({
           paddingBottom: '14px',
         }}
       >
-        {/* State Filter Tabs */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)', fontWeight: 600 }}>
             State:
@@ -326,7 +317,6 @@ export const DocketView: React.FC<DocketViewProps> = ({
           })}
         </div>
 
-        {/* Search Field */}
         <div style={{ minWidth: '220px' }}>
           <input
             type="search"
@@ -340,23 +330,33 @@ export const DocketView: React.FC<DocketViewProps> = ({
         </div>
       </div>
 
-      {/* Table or Empty State */}
-      {filteredExams.length === 0 ? (
+      {error && exams.length > 0 && (
+        <p role="alert" style={{ color: 'var(--sigil-color-alert)', margin: '0 0 16px' }}>
+          Exam data may be out of date: {typeof error === 'string' ? error : error.message}
+        </p>
+      )}
+
+      {exams.length === 0 ? (
         <EmptyState
-          title={stateFilter === 'ALL' && !searchQuery ? 'No examinations scheduled' : 'No matching examinations'}
-          description={
-            stateFilter === 'ALL' && !searchQuery
-              ? 'Create your first examination to configure the schedule, question bank, and key ceremony.'
-              : 'Try clearing the search query or selecting a different lifecycle state filter.'
-          }
-          action={
-            onCreateExam && stateFilter === 'ALL' && !searchQuery ? (
-              <Button variant="primary" onClick={onCreateExam}>
-                Create exam
-              </Button>
-            ) : undefined
-          }
+          title="No examinations scheduled"
+          description="Create your first examination to configure the schedule, question bank, and key ceremony."
+          action={onCreateExam ? <Button variant="primary" onClick={onCreateExam}>Create exam</Button> : undefined}
         />
+      ) : filteredExams.length === 0 ? (
+        <div role="status" style={{ borderTop: '1px solid var(--sigil-color-hairline)', padding: '20px 0' }}>
+          <p style={{ margin: '0 0 12px', color: 'var(--sigil-color-slate)' }}>
+            No examinations match the current search and state filter.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onSearchChange('');
+              onStateFilterChange('ALL');
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
       ) : (
         <LedgerTable
           caption="Scheduled and active examination papers"
