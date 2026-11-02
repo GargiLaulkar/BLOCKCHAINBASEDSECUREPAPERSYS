@@ -3,7 +3,9 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { AppShell } from "./shell/AppShell";
 import { ComponentGallery } from "./gallery/ComponentGallery";
-import { EmptyState, Button, Serial, StateStamp, LedgerTable, CustodyBubbles } from "@sigil/ui";
+import { Button } from "@sigil/ui";
+import { ParticipantsContainer } from "./pages/participants/ParticipantsContainer";
+import { DocketContainer } from "./pages/docket/DocketContainer";
 
 type ApiStatus = "checking" | "online" | "offline";
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:4000";
@@ -80,45 +82,6 @@ function HomeView() {
   );
 }
 
-function AdminParticipantsPlaceholder() {
-  return (
-    <div style={{ padding: '16px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div>
-          <h2>Participant Registry</h2>
-          <p style={{ color: 'var(--sigil-color-slate)', margin: 0 }}>
-            Manage authorized roles on the ExamVault smart contract.
-          </p>
-        </div>
-      </div>
-      <EmptyState
-        title="Participant data layer pending (Member 5: FB-01)"
-        description="The live participant hooks (useParticipants, registerParticipant, revokeParticipant) are part of FB-01 owned by Member 5. Interface requirements documented in docs/HANDOFF.md."
-      />
-    </div>
-  );
-}
-
-function AuthorityDocketPlaceholder() {
-  return (
-    <div style={{ padding: '16px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div>
-          <h2>Examination Docket</h2>
-          <p style={{ color: 'var(--sigil-color-slate)', margin: 0 }}>
-            Active and concluded examination custody records.
-          </p>
-        </div>
-        <Button variant="primary">Create exam</Button>
-      </div>
-      <EmptyState
-        title="Exam docket data layer pending (Member 5: FB-01)"
-        description="The live exam subscription hooks (useExams, useExamDetail, createExam) are part of FB-01 owned by Member 5. Interface requirements documented in docs/HANDOFF.md."
-      />
-    </div>
-  );
-}
-
 export function App() {
   return (
     <AuthProvider>
@@ -132,19 +95,37 @@ export function App() {
               </AppShell>
             }
           />
+          {/* Admin Participants routes */}
           <Route
             path="/admin/participants"
             element={
               <AppShell requireAuth={true} requiredRoles={["ADMIN"]}>
-                <AdminParticipantsPlaceholder />
+                <ParticipantsContainer />
               </AppShell>
             }
           />
           <Route
+            path="/participants"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["ADMIN"]}>
+                <ParticipantsContainer />
+              </AppShell>
+            }
+          />
+          {/* Authority Docket routes */}
+          <Route
             path="/authority/docket"
             element={
               <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
-                <AuthorityDocketPlaceholder />
+                <DocketContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/docket"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
+                <DocketContainer />
               </AppShell>
             }
           />

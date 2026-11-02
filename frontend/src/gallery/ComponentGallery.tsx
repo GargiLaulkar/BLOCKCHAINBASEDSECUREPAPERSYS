@@ -33,6 +33,10 @@ import {
   WrongNetworkGuard,
   NoRoleGuard,
 } from '../components/guards/GuardScreens';
+import { ParticipantsView } from '../pages/participants/ParticipantsView';
+import { DocketView } from '../pages/docket/DocketView';
+import { ParticipantRecord, ParticipantRole } from '../hooks/useParticipants';
+import { ExamSummary } from '../hooks/useExams';
 
 function ToastButtons() {
   const { showToast } = useToast();
@@ -79,6 +83,106 @@ export function ComponentGallery() {
     { serial: 3, title: 'General physics quota test', state: 'Released' as ExamState, holders: '4 / 5', created: '2026-10-28' },
     { serial: 4, title: 'Biology core section trial', state: 'Cancelled' as ExamState, holders: '1 / 3', created: '2026-10-25' },
     { serial: 7, title: 'Practice exam, September', state: 'Draft' as ExamState, holders: '0 / 4', created: '2026-10-24' },
+  ];
+
+  // FA-05: Page states sample data & inspection controls
+  const [participantsState, setParticipantsState] = useState<'populated' | 'loading' | 'empty' | 'error' | 'permission'>('populated');
+  const [docketState, setDocketState] = useState<'populated' | 'loading' | 'empty' | 'error' | 'permission'>('populated');
+  const [galleryRoleFilter, setGalleryRoleFilter] = useState<ParticipantRole | 'ALL'>('ALL');
+  const [galleryDocketFilter, setGalleryDocketFilter] = useState<string | 'ALL'>('ALL');
+  const [gallerySearchQuery, setGallerySearchQuery] = useState<string>('');
+
+  const gallerySampleParticipants: ParticipantRecord[] = [
+    {
+      address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+      roles: ['AUTHORITY'],
+      displayName: 'Dr. Evelyn Vance',
+      organisation: 'State Examination Board',
+      profileHash: '0x1111111111111111111111111111111111111111111111111111111111111111',
+    },
+    {
+      address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+      roles: ['SETTER'],
+      displayName: 'Prof. Marcus Brody',
+      organisation: 'Physics Department',
+      profileHash: '0x2222222222222222222222222222222222222222222222222222222222222222',
+    },
+    {
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+      roles: ['HOLDER'],
+      displayName: 'Chief Custodian Alistair',
+      organisation: 'Security Vault Alpha',
+      profileHash: '0x3333333333333333333333333333333333333333333333333333333333333333',
+    },
+    {
+      address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
+      roles: ['CENTRE'],
+      displayName: 'Metropolitan Exam Centre #04',
+      organisation: 'Regional Testing Authority',
+      profileHash: '0x4444444444444444444444444444444444444444444444444444444444444444',
+    },
+    {
+      address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4df',
+      roles: ['AUDITOR'],
+      displayName: 'Independent Oversight Group',
+      organisation: 'Academic Integrity Bureau',
+      profileHash: '0x5555555555555555555555555555555555555555555555555555555555555555',
+    },
+  ];
+
+  const gallerySampleExams: ExamSummary[] = [
+    {
+      examId: '7',
+      chainId: 31337,
+      state: 1, // Collecting
+      metaHash: '0x8f2d591c0e7b4a2e6f3d1a8c5b7e9f0a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e',
+      releaseOpensAt: '1793527200',
+      examStartsAt: '1793530800',
+      examEndsAt: '1793541600',
+      threshold: 3,
+      bankHash: null,
+      seed: null,
+      ...({ title: 'Higher Secondary Physics 2026' } as any),
+    },
+    {
+      examId: '8',
+      chainId: 31337,
+      state: 2, // Sealed
+      metaHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
+      releaseOpensAt: '1793613600',
+      examStartsAt: '1793617200',
+      examEndsAt: '1793628000',
+      threshold: 3,
+      bankHash: '0x5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b',
+      seed: null,
+      ...({ title: 'Organic Chemistry & Biochemistry Paper 1' } as any),
+    },
+    {
+      examId: '9',
+      chainId: 31337,
+      state: 3, // Released
+      metaHash: '0x9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f',
+      releaseOpensAt: '1793440800',
+      examStartsAt: '1793444400',
+      examEndsAt: '1793455200',
+      threshold: 4,
+      bankHash: '0x4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c',
+      seed: '0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b',
+      ...({ title: 'Pure Mathematics & Linear Algebra' } as any),
+    },
+    {
+      examId: '10',
+      chainId: 31337,
+      state: 4, // Concluded
+      metaHash: '0x3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d',
+      releaseOpensAt: '1793354400',
+      examStartsAt: '1793358000',
+      examEndsAt: '1793368800',
+      threshold: 3,
+      bankHash: '0x2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e',
+      seed: '0x6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c',
+      ...({ title: 'Computer Science & Algorithmics 2026' } as any),
+    },
   ];
 
   return (
@@ -680,6 +784,127 @@ export function ComponentGallery() {
               <NoRoleGuard
                 account="0x1111111111111111111111111111111111111111"
                 onDisconnect={() => alert('Disconnect requested')}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ============================================================== */}
+        {/* FA-05: PAGE STATES (PARTICIPANTS & DOCKET)                    */}
+        {/* ============================================================== */}
+        <section id="fa-05-pages">
+          <h2>FA-05: Page states (Admin participants & Authority docket)</h2>
+          <p style={{ color: 'var(--sigil-color-slate)' }}>
+            Every state of the live pages inspected with sample values: populated live data, skeleton loading, empty state, network error, and permission denied.
+          </p>
+
+          {/* Sub-section 1: Admin Participants */}
+          <div style={{ marginTop: '24px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px', padding: '24px', background: 'var(--sigil-color-sheet)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', margin: '0 0 4px 0', color: 'var(--sigil-color-ink)' }}>
+                  1. Admin participants page states
+                </h3>
+                <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)' }}>
+                  Ledger table with role filter, register participant dialog, and revoke confirmation Coupon.
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['populated', 'loading', 'empty', 'error', 'permission'] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setParticipantsState(st)}
+                    style={{
+                      border: '1px solid',
+                      borderColor: participantsState === st ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                      backgroundColor: participantsState === st ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                      color: participantsState === st ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--sigil-font-mono)',
+                      padding: '4px 8px',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                      fontWeight: participantsState === st ? 600 : 400,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--sigil-color-mist)', padding: '16px', borderRadius: '2px' }}>
+              <ParticipantsView
+                participants={participantsState === 'populated' ? gallerySampleParticipants : []}
+                isLoading={participantsState === 'loading'}
+                error={participantsState === 'error' ? new Error('Simulated RPC network timeout connecting to node.') : null}
+                permissionDenied={participantsState === 'permission'}
+                roleFilter={galleryRoleFilter}
+                onRoleFilterChange={setGalleryRoleFilter}
+                onRegister={async (input) => {
+                  alert(`Register participant: ${input.address} as ${input.role}`);
+                }}
+                onRevoke={async (input) => {
+                  alert(`Revoke participant: ${input.address} role ${input.role}`);
+                }}
+                onRetry={() => setParticipantsState('populated')}
+              />
+            </div>
+          </div>
+
+          {/* Sub-section 2: Authority Docket */}
+          <div style={{ marginTop: '32px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px', padding: '24px', background: 'var(--sigil-color-sheet)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', margin: '0 0 4px 0', color: 'var(--sigil-color-ink)' }}>
+                  2. Authority exam docket page states
+                </h3>
+                <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)' }}>
+                  Serial (No. 0007), title, inline custody bubbles, release window, and panel threshold.
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['populated', 'loading', 'empty', 'error', 'permission'] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setDocketState(st)}
+                    style={{
+                      border: '1px solid',
+                      borderColor: docketState === st ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                      backgroundColor: docketState === st ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                      color: docketState === st ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--sigil-font-mono)',
+                      padding: '4px 8px',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                      fontWeight: docketState === st ? 600 : 400,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--sigil-color-mist)', padding: '16px', borderRadius: '2px' }}>
+              <DocketView
+                exams={docketState === 'populated' ? gallerySampleExams : []}
+                isLoading={docketState === 'loading'}
+                error={docketState === 'error' ? new Error('Simulated backend service 503 unavailable.') : null}
+                permissionDenied={docketState === 'permission'}
+                stateFilter={galleryDocketFilter}
+                onStateFilterChange={setGalleryDocketFilter}
+                searchQuery={gallerySearchQuery}
+                onSearchChange={setGallerySearchQuery}
+                onCreateExam={() => alert('Navigate to Create Exam wizard')}
+                onRowClick={(e) => alert(`Selected exam #${e.examId}`)}
+                onRetry={() => setDocketState('populated')}
+                panelHolders={{ '7': 5, '8': 5, '9': 5, '10': 5 }}
               />
             </div>
           </div>
