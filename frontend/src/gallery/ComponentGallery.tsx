@@ -44,6 +44,25 @@ import type {
   CommandCentreExam,
   CommandCentreReadinessRow,
 } from '../pages/command-centre/types';
+import { SetterAssignmentsView } from '../pages/setter/SetterAssignmentsView';
+import { QuestionComposerView } from '../pages/setter/QuestionComposerView';
+import type {
+  QuestionComposerViewProps,
+  SetterAssignment,
+  SetterPageState,
+  SetterSubmission,
+  SubmissionProgress,
+} from '../pages/setter/types';
+import type { QuestionImportError } from '../pages/setter/question-import';
+import { HolderAssignmentsView } from '../pages/holder/HolderAssignmentsView';
+import { HolderConsoleView } from '../pages/holder/HolderConsoleView';
+import type {
+  HolderAssignmentsViewProps,
+  HolderConsoleActions,
+  HolderConsoleSnapshot,
+  HolderExamAssignment,
+  HolderPageState,
+} from '../pages/holder/types';
 import { timestampInputValue } from '../pages/create-exam/validation';
 import type { ExamWizardContext, ExamWizardDraft } from '../pages/create-exam/types';
 
@@ -115,6 +134,16 @@ export function ComponentGallery() {
   const [commandCentreSealState, setCommandCentreSealState] = useState<
     'quota' | 'randomness' | 'ready'
   >('quota');
+  const [setterAssignmentsPageState, setSetterAssignmentsPageState] = useState<SetterPageState>('ready');
+  const [questionComposerPageState, setQuestionComposerPageState] = useState<SetterPageState>('ready');
+  const [questionComposerFlowState, setQuestionComposerFlowState] = useState<
+    'idle' | 'encrypt' | 'upload' | 'sign' | 'confirm' | 'complete' | 'error'
+  >('idle');
+  const [holderAssignmentsPageState, setHolderAssignmentsPageState] = useState<HolderPageState>('ready');
+  const [holderConsolePageState, setHolderConsolePageState] = useState<HolderPageState>('ready');
+  const [holderConsoleFlowState, setHolderConsoleFlowState] = useState<
+    'setup' | 'commitment-pending' | 'ready-to-release' | 'window-closed' | 'already-submitted' | 'submit-error'
+  >('setup');
 
   const sampleChainTime = Math.floor(Date.now() / 1000);
   const wizardSampleDraft: ExamWizardDraft = {
@@ -323,6 +352,143 @@ export function ComponentGallery() {
       holderCount: 5,
     },
   ];
+  const setterGalleryAssignment: SetterAssignment = {
+    examId: '7',
+    title: 'Regional Physics Examination',
+    state: 'Collecting',
+    sections: [{ sectionId: 0, name: 'Physics', quota: 45, submitted: 12 }],
+  };
+  const setterGallerySubmissions: SetterSubmission[] = [
+    {
+      id: 'gallery-batch-confirmed',
+      sectionId: 0,
+      questionCount: 12,
+      hash: `0x${'a'.repeat(64)}`,
+      transactionHash: `0x${'b'.repeat(64)}`,
+      status: 'confirmed',
+      submittedAt: new Date(sampleChainTime * 1000).toISOString(),
+    },
+    {
+      id: 'gallery-batch-pending',
+      sectionId: 0,
+      questionCount: 4,
+      hash: `0x${'c'.repeat(64)}`,
+      transactionHash: `0x${'d'.repeat(64)}`,
+      status: 'pending',
+    },
+  ];
+  const setterGalleryImportErrors: QuestionImportError[] = [
+    {
+      row: 3,
+      column: 'option3',
+      problem: 'This option duplicates option2 after trimming.',
+    },
+  ];
+  const setterFlowStages = {
+    idle: ['pending', 'pending', 'pending', 'pending'],
+    encrypt: ['active', 'pending', 'pending', 'pending'],
+    upload: ['complete', 'active', 'pending', 'pending'],
+    sign: ['complete', 'complete', 'active', 'pending'],
+    confirm: ['complete', 'complete', 'complete', 'active'],
+    complete: ['complete', 'complete', 'complete', 'complete'],
+    error: ['complete', 'error', 'pending', 'pending'],
+  } as const;
+  const [
+    encryptProgress,
+    uploadProgress,
+    signProgress,
+    confirmProgress,
+  ] = setterFlowStages[questionComposerFlowState];
+  const setterFlowProgress: SubmissionProgress = {
+    encrypt: encryptProgress,
+    upload: uploadProgress,
+    sign: signProgress,
+    confirm: confirmProgress,
+  };
+  const setterComposerProps: QuestionComposerViewProps = {
+    pageState: questionComposerPageState,
+    exam: questionComposerPageState === 'ready' ? setterGalleryAssignment : null,
+    error: questionComposerPageState === 'error'
+      ? new Error('Sample setter exam data could not be loaded.')
+      : null,
+    submissions: setterGallerySubmissions,
+    importErrors: questionComposerFlowState === 'error' ? setterGalleryImportErrors : [],
+    progress: setterFlowProgress,
+    statusMessage: questionComposerFlowState === 'complete'
+      ? 'The encrypted batch was confirmed on-chain.'
+      : null,
+    actionError: questionComposerFlowState === 'error'
+      ? 'Encrypted batch upload failed. Retry this batch safely.'
+      : null,
+    hasPreparedBatch: questionComposerFlowState === 'error',
+    onImport: async () => ({ questions: [], errors: [] }),
+    onSubmit: async () => undefined,
+  };
+  const holderGalleryExam: HolderExamAssignment = {
+    examId: '7',
+    title: 'Regional Physics Examination',
+    state: ['ready-to-release', 'window-closed', 'already-submitted', 'submit-error'].includes(holderConsoleFlowState)
+      ? holderConsoleFlowState === 'already-submitted' ? 'Released' : 'Sealed'
+      : 'Collecting',
+    rosetteHash: ['ready-to-release', 'window-closed', 'already-submitted', 'submit-error'].includes(holderConsoleFlowState)
+      ? commandCentreBankHash
+      : commandCentreMetaHash,
+    releaseOpensAt: holderConsoleFlowState === 'ready-to-release' ||
+      holderConsoleFlowState === 'already-submitted' ||
+      holderConsoleFlowState === 'submit-error'
+      ? sampleChainTime - 300
+      : sampleChainTime + 1_800,
+    examStartsAt: sampleChainTime + 3_600,
+    examEndsAt: holderConsoleFlowState === 'window-closed'
+      ? sampleChainTime - 60
+      : sampleChainTime + 7_200,
+    threshold: 3,
+    holderCount: 5,
+    sections: [{ name: 'Physics', quota: 45 }],
+  };
+  const holderGallerySnapshot: HolderConsoleSnapshot = {
+    exam: holderGalleryExam,
+    keyRegistered: holderConsoleFlowState !== 'setup',
+    shareUnlocked: ['commitment-pending', 'ready-to-release', 'window-closed', 'already-submitted', 'submit-error']
+      .includes(holderConsoleFlowState),
+    shareVerified: ['ready-to-release', 'window-closed', 'already-submitted', 'submit-error']
+      .includes(holderConsoleFlowState),
+    randomnessCommitted: ['ready-to-release', 'window-closed', 'already-submitted', 'submit-error']
+      .includes(holderConsoleFlowState),
+    shareSubmitted: holderConsoleFlowState === 'already-submitted',
+    submissionCount: holderConsoleFlowState === 'already-submitted' ? 3 : 2,
+    chainTime: sampleChainTime,
+  };
+  const holderGalleryActions: HolderConsoleActions = {
+    setupPassphrase: '',
+    releasePassphrase: '',
+    isGeneratingKeystore: false,
+    hasGeneratedKeystore: false,
+    hasDownloadedKeystore: false,
+    hasKeystoreFile: holderGallerySnapshot.shareUnlocked,
+    isRegisteringKey: false,
+    isUnlocking: false,
+    isCommittingRandomness: false,
+    isSubmittingShare: false,
+    isTransactionPending: false,
+    actionMessage: holderConsoleFlowState === 'ready-to-release'
+      ? 'Share verified against the on-chain commitment.'
+      : null,
+    actionError: holderConsoleFlowState === 'submit-error'
+      ? 'The release window has not opened at chain time (TooEarly).'
+      : null,
+    onSetupPassphraseChange: () => undefined,
+    onGenerateKeystore: () => undefined,
+    onDownloadKeystore: () => undefined,
+    onRegisterKey: () => undefined,
+    onKeystoreFile: () => undefined,
+    onReleasePassphraseChange: () => undefined,
+    onUnlockShare: () => undefined,
+    onCommitRandomness: () => undefined,
+    onSubmitShare: () => undefined,
+    onClearSecrets: () => undefined,
+    onRetry: () => undefined,
+  };
 
   return (
     <ToastProvider>
@@ -1292,6 +1458,192 @@ export function ComponentGallery() {
                 onSeal={() => undefined}
                 onConclude={() => undefined}
                 onCancel={() => undefined}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="fa-09-pages" style={{ borderTop: '1px solid var(--sigil-color-hairline)', paddingTop: '32px' }}>
+          <h2>FA-09: Setter flow page states</h2>
+          <p style={{ color: 'var(--sigil-color-slate)' }}>
+            Gallery-only assignments, question import errors, quota data, and submission progress. Operational pages use live exam and chain data.
+          </p>
+
+          <div data-testid="setter-assignments-gallery" style={{ marginTop: '20px', padding: '20px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <h3>Setter assignments</h3>
+            <div data-testid="setter-assignments-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+              {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setSetterAssignmentsPageState(state)}
+                  aria-pressed={setterAssignmentsPageState === state}
+                  style={{
+                    minHeight: '32px',
+                    padding: '5px 9px',
+                    border: '1px solid var(--sigil-color-hairline)',
+                    background: setterAssignmentsPageState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: setterAssignmentsPageState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+            <div data-testid="setter-assignments-preview" style={{ background: 'var(--sigil-color-mist)' }}>
+              <SetterAssignmentsView
+                pageState={setterAssignmentsPageState}
+                assignments={[setterGalleryAssignment]}
+                error={new Error('Sample setter assignment request failed.')}
+                onRetry={() => setSetterAssignmentsPageState('ready')}
+                onOpenQuestions={() => undefined}
+              />
+            </div>
+          </div>
+
+          <div data-testid="question-composer-gallery" style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <h3>Question composer</h3>
+            <h4>Page state</h4>
+            <div data-testid="question-composer-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+              {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setQuestionComposerPageState(state)}
+                  aria-pressed={questionComposerPageState === state}
+                  style={{
+                    minHeight: '32px',
+                    padding: '5px 9px',
+                    border: '1px solid var(--sigil-color-hairline)',
+                    background: questionComposerPageState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: questionComposerPageState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+            <h4>Submission progress</h4>
+            <div data-testid="question-composer-flow-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+              {(['idle', 'encrypt', 'upload', 'sign', 'confirm', 'complete', 'error'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setQuestionComposerFlowState(state)}
+                  aria-pressed={questionComposerFlowState === state}
+                  style={{
+                    minHeight: '32px',
+                    padding: '5px 9px',
+                    border: '1px solid var(--sigil-color-hairline)',
+                    background: questionComposerFlowState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: questionComposerFlowState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+            <div data-testid="question-composer-preview" style={{ background: 'var(--sigil-color-mist)' }}>
+              <QuestionComposerView
+                {...setterComposerProps}
+                onRetry={() => setQuestionComposerPageState('ready')}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="fa-10-pages" style={{ borderTop: '1px solid var(--sigil-color-hairline)', paddingTop: '32px' }}>
+          <h2>FA-10: Key holder flow page states</h2>
+          <p style={{ color: 'var(--sigil-color-slate)' }}>
+            Sample exam records below exist only in this gallery. Secrets are never included in the sample props.
+          </p>
+
+          <div data-testid="holder-assignments-gallery" style={{ marginTop: '20px', padding: '20px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <h3>Holder assignments</h3>
+            <div data-testid="holder-assignments-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+              {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setHolderAssignmentsPageState(state)}
+                  aria-pressed={holderAssignmentsPageState === state}
+                  style={{
+                    minHeight: '32px',
+                    padding: '5px 9px',
+                    border: '1px solid var(--sigil-color-hairline)',
+                    background: holderAssignmentsPageState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: holderAssignmentsPageState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+            <div data-testid="holder-assignments-preview">
+              <HolderAssignmentsView
+                pageState={holderAssignmentsPageState}
+                assignments={[holderGalleryExam]}
+                error={new Error('Sample holder assignments could not be loaded.')}
+                onRetry={() => setHolderAssignmentsPageState('ready')}
+                onOpenExam={() => undefined}
+              />
+            </div>
+          </div>
+
+          <div data-testid="holder-console-gallery" style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <h3>Holder exam console</h3>
+            <h4>Page state</h4>
+            <div data-testid="holder-console-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+              {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setHolderConsolePageState(state)}
+                  aria-pressed={holderConsolePageState === state}
+                  style={{
+                    minHeight: '32px',
+                    padding: '5px 9px',
+                    border: '1px solid var(--sigil-color-hairline)',
+                    background: holderConsolePageState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: holderConsolePageState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+            <h4>Key, share and release progress</h4>
+            <div data-testid="holder-console-flow-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+              {(['setup', 'commitment-pending', 'ready-to-release', 'window-closed', 'already-submitted', 'submit-error'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setHolderConsoleFlowState(state)}
+                  aria-pressed={holderConsoleFlowState === state}
+                  style={{
+                    minHeight: '32px',
+                    padding: '5px 9px',
+                    border: '1px solid var(--sigil-color-hairline)',
+                    background: holderConsoleFlowState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: holderConsoleFlowState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+            <div data-testid="holder-console-preview">
+              <HolderConsoleView
+                pageState={holderConsolePageState}
+                snapshot={holderGallerySnapshot}
+                error={new Error('Sample holder console data could not be loaded.')}
+                actions={holderGalleryActions}
               />
             </div>
           </div>

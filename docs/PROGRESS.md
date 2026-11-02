@@ -64,6 +64,8 @@ Current verification (2026-10-18 / 2026-10-19): migration deploy and reset passe
 | FA-05 | Admin participants and Authority docket | Completed | Live-data pages use the merged FB-01 hooks; targeted and full frontend checks passed |
 | FA-06 | Create Exam wizard and Key Ceremony | Implemented; owner follow-up required | Wizard, ceremony workflow, and sample-only gallery states implemented with generated API types, chain reads, and TxDrawer transactions. Private-key zeroization remains unverified by the current core implementation; see HANDOFF. |
 | FA-07 | Exam command centre | Implemented; owner follow-up required | Chain-backed lifecycle, quotas, readiness, coupons, and sample-only gallery states implemented. Share verification is not tracked by the current readiness API; contract/spec quota semantics need an ICR. See HANDOFF. |
+| FA-09 | Setter flow | Completed | Setter assignments, validated question composer/import, encrypted batch submission, retry lifecycle, and component/workflow tests. Desktop/mobile gallery verification passed; the missing section-totals hook request is recorded in HANDOFF. |
+| FA-10 | Key holder flow | Completed; owner follow-up required | Keystore setup, encrypted-share verification, randomness commitment, and release console pass tests and desktop/mobile gallery verification. The missing holder-status hook, best-effort memory cleanup, and `submitShare` network-privacy assumption are recorded in HANDOFF. |
 
 ## Frontend B (Member 5) – FB-01 Data Hooks
 

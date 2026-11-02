@@ -9,6 +9,10 @@ import { DocketContainer } from "./pages/docket/DocketContainer";
 import { CreateExamContainer } from "./pages/create-exam/CreateExamContainer";
 import { KeyCeremonyContainer } from "./pages/key-ceremony/KeyCeremonyContainer";
 import { CommandCentreContainer } from "./pages/command-centre/CommandCentreContainer";
+import { SetterAssignmentsContainer } from "./pages/setter/SetterAssignmentsContainer";
+import { QuestionComposerContainer } from "./pages/setter/QuestionComposerContainer";
+import { HolderAssignmentsContainer } from "./pages/holder/HolderAssignmentsContainer";
+import { HolderConsoleContainer } from "./pages/holder/HolderConsoleContainer";
 
 type ApiStatus = "checking" | "online" | "offline";
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:4000";
@@ -153,6 +157,46 @@ export function App() {
             element={
               <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
                 <DocketContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/setter/assignments"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["SETTER"]}>
+                <SetterAssignmentsContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/setter/batches"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["SETTER"]}>
+                <SetterAssignmentsContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/setter/exams/:examId/questions"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["SETTER"]}>
+                <QuestionComposerContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/holder/console"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["HOLDER"]}>
+                <HolderAssignmentsContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/holder/exams/:examId"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["HOLDER"]}>
+                <HolderConsoleContainer />
               </AppShell>
             }
           />

@@ -22,11 +22,19 @@ const browser = spawn(chromePath, [
   '--window-size=1280,1000',
   'about:blank',
 ], { stdio: 'ignore' });
+const browserClosed = new Promise((resolve) => {
+  if (browser.exitCode !== null) {
+    resolve();
+  } else {
+    browser.once('exit', resolve);
+  }
+});
 
 let socket;
 let nextId = 0;
 const pending = new Map();
 const checks = [];
+const consoleErrors = [];
 let screenshotCount = 0;
 
 function assert(condition, message) {
@@ -69,6 +77,18 @@ function connectPage(webSocketUrl) {
     socket.addEventListener('error', reject);
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
+      if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
+        consoleErrors.push(message.params.args.map((argument) =>
+          argument.value ?? argument.description ?? '[unserializable console error]',
+        ).join(' '));
+      }
+      if (message.method === 'Runtime.exceptionThrown') {
+        consoleErrors.push(message.params.exceptionDetails.exception?.description ??
+          message.params.exceptionDetails.text ?? 'Uncaught browser exception');
+      }
+      if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') {
+        consoleErrors.push(message.params.entry.text);
+      }
       if (!message.id) return;
       const item = pending.get(message.id);
       if (!item) return;
@@ -110,27 +130,49 @@ async function capture(name, selector) {
   const rect = await evaluate(`(() => {
     const element = document.querySelector(${JSON.stringify(selector)});
     if (!element) throw new Error('Screenshot element not found: ' + ${JSON.stringify(selector)});
-    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    if (${JSON.stringify(selector)} === 'body') {
+      window.scrollTo(0, 0);
+    } else {
+      element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
     const rect = element.getBoundingClientRect();
-    return { x: rect.x + scrollX, y: rect.y + scrollY, width: rect.width, height: rect.height };
+    return {
+      width: rect.width,
+      height: rect.height,
+    };
   })()`);
   assert(rect.width > 0 && rect.height > 0, `Screenshot element is empty: ${selector}`);
+  await evaluate('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   const image = await command('Page.captureScreenshot', {
     format: 'png',
-    captureBeyondViewport: true,
-    clip: { ...rect, scale: 1 },
+    captureBeyondViewport: false,
   });
   await writeFile(join(screenshotDir, `${name}.png`), Buffer.from(image.data, 'base64'));
   screenshotCount += 1;
-  if (name.startsWith('mobile-')) {
+  if (name.startsWith('mobile-') || name.startsWith('desktop-')) {
+    const expectedWidth = name.startsWith('mobile-') ? 390 : 1280;
     const pageMetrics = await evaluate(`(() => ({
       innerWidth,
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
+      overflowingElements: [...document.querySelectorAll('body *')]
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            tag: element.tagName,
+            className: typeof element.className === 'string' ? element.className : '',
+            testId: element.getAttribute('data-testid'),
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+          };
+        })
+        .filter((element) => element.right > document.documentElement.clientWidth + 1)
+        .slice(0, 12),
     }))()`);
     assert(
-      pageMetrics.innerWidth === 390 && pageMetrics.scrollWidth <= pageMetrics.clientWidth,
-      `Horizontal page scrolling at mobile state ${name}: ${JSON.stringify(pageMetrics)}`,
+      pageMetrics.innerWidth === expectedWidth && pageMetrics.scrollWidth <= pageMetrics.clientWidth,
+      `Horizontal page scrolling or wrong viewport at ${name}: ${JSON.stringify(pageMetrics)}`,
     );
   }
   if (name.endsWith('participants-populated') || name.endsWith('docket-populated')) {
@@ -170,6 +212,28 @@ async function capture(name, selector) {
           touchTargets.docketSearch >= 44;
       assert(touchTargetsReady, `Mobile page controls are smaller than 44px: ${JSON.stringify(touchTargets)}`);
     }
+  }
+  if (name === 'mobile-fa09-setter-assignments-ready') {
+    const heights = await evaluate(`(() => [...document.querySelectorAll('.setter-page .setter-table .sigil-button')]
+      .map((element) => element.getBoundingClientRect().height))()`);
+    assert(heights.length > 0 && heights.every((height) => height >= 44), `Setter assignment touch targets are under 44px: ${JSON.stringify(heights)}`);
+  }
+  if (name === 'mobile-fa09-question-composer-ready') {
+    const heights = await evaluate(`(() => [
+      ...document.querySelectorAll('.question-composer .sigil-input, .question-composer .setter-section-select select, .question-composer .question-composer__file input, .question-composer .question-composer__option > label, .question-composer .question-composer__form .sigil-button'),
+    ].map((element) => element.getBoundingClientRect().height))()`);
+    assert(heights.length > 0 && heights.every((height) => height >= 44), `Question composer touch targets are under 44px: ${JSON.stringify(heights)}`);
+  }
+  if (name === 'mobile-fa10-holder-assignments-ready') {
+    const heights = await evaluate(`(() => [...document.querySelectorAll('.holder-table .sigil-button')]
+      .map((element) => element.getBoundingClientRect().height))()`);
+    assert(heights.length > 0 && heights.every((height) => height >= 44), `Holder assignment touch targets are under 44px: ${JSON.stringify(heights)}`);
+  }
+  if (name === 'mobile-fa10-holder-console-flow-ready-to-release') {
+    const heights = await evaluate(`(() => [
+      ...document.querySelectorAll('.holder-release__action input[type="password"], .holder-release__action .sigil-button'),
+    ].map((element) => element.getBoundingClientRect().height))()`);
+    assert(heights.length > 0 && heights.every((height) => height >= 44), `Holder release touch targets are under 44px: ${JSON.stringify(heights)}`);
   }
 }
 
@@ -212,6 +276,15 @@ async function viewportMetrics(width) {
     };
   })()`);
   assert(metrics.innerWidth === width, `Expected innerWidth ${width}, got ${metrics.innerWidth}`);
+  assert(
+    metrics.scrollWidth <= metrics.clientWidth,
+    `Horizontal page scrolling at ${width}px: ${JSON.stringify(metrics)}`,
+  );
+  if (width === 1280) {
+    assert(metrics.rosetteWidth === 52, `Expected a 52px laptop command-centre Rosette: ${JSON.stringify(metrics)}`);
+  } else {
+    assert(metrics.rosetteWidth >= 40, `Mobile command-centre Rosette is too small: ${JSON.stringify(metrics)}`);
+  }
   checks.push({ width, metrics });
   return metrics;
 }
@@ -399,6 +472,24 @@ async function captureGalleryStates(prefix) {
   checks.push({ width: finalMetrics.innerWidth, finalMetrics });
 }
 
+async function clickControl(testId, state) {
+  await click(`(() => {
+    const controls = document.querySelector('[data-testid="${testId}"]');
+    const button = [...(controls?.querySelectorAll('button') ?? [])]
+      .find((item) => item.textContent.trim() === ${JSON.stringify(state)});
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+}
+
+async function capturePageStateSet(prefix, pageName, controlsId, previewSelector, states) {
+  for (const state of states) {
+    await clickControl(controlsId, state);
+    await capture(`${prefix}${pageName}-${state}`, `[data-testid="${previewSelector}"]`);
+  }
+}
+
 try {
   await mkdir(screenshotDir, { recursive: true });
   const { port, version } = await waitForEndpoint();
@@ -408,6 +499,7 @@ try {
   await connectPage(target.webSocketDebuggerUrl);
   await command('Page.enable');
   await command('Runtime.enable');
+  await command('Log.enable');
   await command('Page.navigate', { url: baseUrl });
   await waitForGallery();
 
@@ -415,13 +507,42 @@ try {
     const prefix = width === 1280 ? 'desktop-' : 'mobile-';
     const metrics = await viewportMetrics(width);
     await captureGalleryStates(prefix);
+    await clickControl('question-composer-flow-controls', 'idle');
+    await clickControl('holder-console-flow-controls', 'setup');
+    await capturePageStateSet(prefix, 'fa09-setter-assignments', 'setter-assignments-state-controls', 'setter-assignments-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
+    await capturePageStateSet(prefix, 'fa09-question-composer', 'question-composer-state-controls', 'question-composer-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
+    await capturePageStateSet(prefix, 'fa10-holder-assignments', 'holder-assignments-state-controls', 'holder-assignments-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
+    await capturePageStateSet(prefix, 'fa10-holder-console', 'holder-console-state-controls', 'holder-console-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
+    await clickControl('question-composer-state-controls', 'ready');
+    for (const state of ['idle', 'encrypt', 'upload', 'sign', 'confirm', 'complete', 'error']) {
+      await clickControl('question-composer-flow-controls', state);
+      await capture(`${prefix}fa09-question-composer-flow-${state}`, '[data-testid="question-composer-preview"]');
+    }
+    await clickControl('holder-console-state-controls', 'ready');
+    for (const state of ['setup', 'commitment-pending', 'ready-to-release', 'window-closed', 'already-submitted', 'submit-error']) {
+      await clickControl('holder-console-flow-controls', state);
+      await capture(`${prefix}fa10-holder-console-flow-${state}`, '[data-testid="holder-console-preview"]');
+    }
     console.log(JSON.stringify({ width, metrics, screenshots: screenshotCount }));
   }
 
-  console.log(JSON.stringify({ browser: version.Browser, screenshotCount, checks }, null, 2));
+  const storageState = await evaluate(`(() => ({
+    localStorage: Object.keys(localStorage),
+    sessionStorage: Object.keys(sessionStorage),
+  }))()`);
+  assert(storageState.localStorage.length === 0, `localStorage is not empty: ${JSON.stringify(storageState.localStorage)}`);
+  assert(storageState.sessionStorage.length === 0, `sessionStorage is not empty: ${JSON.stringify(storageState.sessionStorage)}`);
+  assert(consoleErrors.length === 0, `Browser console errors: ${JSON.stringify(consoleErrors)}`);
+  console.log(JSON.stringify({
+    browser: version.Browser,
+    screenshotCount,
+    storageState,
+    consoleErrors,
+    checks,
+  }, null, 2));
 } finally {
   socket?.close();
   browser.kill();
-  await delay(250);
-  await rm(profileDir, { recursive: true, force: true });
+  await Promise.race([browserClosed, delay(5_000)]);
+  await rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

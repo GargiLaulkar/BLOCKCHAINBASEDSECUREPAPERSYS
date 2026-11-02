@@ -40,7 +40,7 @@ export const TopBar: React.FC = () => {
     }
 
     if (roles.includes('SETTER')) {
-      links.push({ label: 'Question batches', to: '/setter/batches' });
+      links.push({ label: 'Question composer', to: '/setter/assignments' });
     }
 
     if (roles.includes('HOLDER')) {
