@@ -37,6 +37,10 @@ import { ParticipantsView } from '../pages/participants/ParticipantsView';
 import { DocketView } from '../pages/docket/DocketView';
 import { ParticipantRecord, ParticipantRole } from '../pages/participants/types';
 import { DocketExam } from '../pages/docket/types';
+import { CreateExamView } from '../pages/create-exam/CreateExamView';
+import { KeyCeremonyView } from '../pages/key-ceremony/KeyCeremonyView';
+import { timestampInputValue } from '../pages/create-exam/validation';
+import type { ExamWizardContext, ExamWizardDraft } from '../pages/create-exam/types';
 
 function ToastButtons() {
   const { showToast } = useToast();
@@ -91,6 +95,45 @@ export function ComponentGallery() {
   const [galleryRoleFilter, setGalleryRoleFilter] = useState<ParticipantRole | 'ALL'>('ALL');
   const [galleryDocketFilter, setGalleryDocketFilter] = useState<string | 'ALL'>('ALL');
   const [gallerySearchQuery, setGallerySearchQuery] = useState<string>('');
+  const [createExamGalleryState, setCreateExamGalleryState] = useState<
+    'populated' | 'loading' | 'empty' | 'error' | 'permission' | 'created' | 'metadata-error'
+  >('populated');
+  const [ceremonyGalleryState, setCeremonyGalleryState] = useState<
+    'ready' | 'loading' | 'empty' | 'error' | 'permission' | 'blocked' | 'failed' | 'complete'
+  >('ready');
+
+  const sampleChainTime = Math.floor(Date.now() / 1000);
+  const wizardSampleDraft: ExamWizardDraft = {
+    title: 'Regional Physics Examination',
+    sections: [{ name: 'Physics', quota: '45' }, { name: 'Chemistry', quota: '40' }],
+    releaseOpensAt: timestampInputValue(sampleChainTime + 3_600),
+    examStartsAt: timestampInputValue(sampleChainTime + 7_200),
+    examEndsAt: timestampInputValue(sampleChainTime + 14_400),
+    threshold: '3',
+    holders: [
+      '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+      '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+      '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+    ],
+    setters: ['0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'],
+    centres: ['0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc'],
+  };
+  const wizardContext: ExamWizardContext = {
+    participants: [
+      { address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', roles: ['HOLDER'] },
+      { address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', roles: ['HOLDER'] },
+      { address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', roles: ['HOLDER'] },
+      { address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', roles: ['SETTER'] },
+      { address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', roles: ['CENTRE'] },
+    ],
+    encryptionKeys: {
+      '0x70997970c51812dc3a010c7d01b50e0d17dc79c8': true,
+      '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': true,
+      '0x90f79bf6eb2c4f870365e785982e1f101e93b906': true,
+    },
+    chainTime: sampleChainTime,
+    minLeadSeconds: 60,
+  };
 
   const gallerySampleParticipants: ParticipantRecord[] = [
     {
@@ -912,6 +955,141 @@ export function ComponentGallery() {
                 onCreateExam={() => alert('Navigate to Create Exam wizard')}
                 onRowClick={(e) => alert(`Selected exam #${e.examId}`)}
                 onRetry={() => setDocketState('populated')}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="fa-06-pages" style={{ borderTop: '1px solid var(--sigil-color-hairline)', paddingTop: '32px' }}>
+          <h2>FA-06: Create Exam wizard and Key Ceremony page states</h2>
+          <p style={{ color: 'var(--sigil-color-slate)' }}>
+            Sample records below exist only in this gallery. Open the step list to inspect each wizard form.
+          </p>
+
+          <div style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>Create Exam wizard</h3>
+                <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)' }}>
+                  Details, sections and quotas, schedule, panel and threshold, setters and centres, review and sign.
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {(['populated', 'loading', 'empty', 'error', 'permission', 'metadata-error', 'created'] as const).map((state) => (
+                  <button
+                    key={state}
+                    type="button"
+                    onClick={() => setCreateExamGalleryState(state)}
+                    aria-pressed={createExamGalleryState === state}
+                    style={{
+                      border: '1px solid',
+                      borderColor: createExamGalleryState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                      background: createExamGalleryState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                      color: createExamGalleryState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--sigil-font-mono)',
+                      padding: '4px 8px',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {state}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: 'var(--sigil-color-mist)', padding: '12px' }}>
+              <CreateExamView
+                pageState={
+                  createExamGalleryState === 'populated' ||
+                  createExamGalleryState === 'metadata-error' ||
+                  createExamGalleryState === 'created'
+                    ? 'ready'
+                    : createExamGalleryState
+                }
+                context={wizardContext}
+                initialDraft={wizardSampleDraft}
+                createdExamId={
+                  createExamGalleryState === 'created' || createExamGalleryState === 'metadata-error'
+                    ? '7'
+                    : null
+                }
+                metadataStored={createExamGalleryState === 'created'}
+                metadataError={
+                  createExamGalleryState === 'metadata-error'
+                    ? 'Exam No. 0007 was created on-chain, but metadata storage failed. Retry metadata storage.'
+                    : null
+                }
+                error={new Error('Sample participant or chain request failed.')}
+                onCreate={() => setCreateExamGalleryState('created')}
+                onRetryMetadata={() => setCreateExamGalleryState('created')}
+                onStartCeremony={() => setCeremonyGalleryState('ready')}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>Key Ceremony</h3>
+                <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)' }}>
+                  Browser-only ceremony progress, encrypted share upload, and Open collection coupon.
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {(['ready', 'loading', 'empty', 'error', 'permission', 'blocked', 'failed', 'complete'] as const).map((state) => (
+                  <button
+                    key={state}
+                    type="button"
+                    onClick={() => setCeremonyGalleryState(state)}
+                    aria-pressed={ceremonyGalleryState === state}
+                    style={{
+                      border: '1px solid',
+                      borderColor: ceremonyGalleryState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                      background: ceremonyGalleryState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                      color: ceremonyGalleryState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--sigil-font-mono)',
+                      padding: '4px 8px',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {state}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: 'var(--sigil-color-mist)', padding: '12px' }}>
+              <KeyCeremonyView
+                pageState={
+                  ceremonyGalleryState === 'blocked' ||
+                  ceremonyGalleryState === 'failed' ||
+                  ceremonyGalleryState === 'complete'
+                    ? 'ready'
+                    : ceremonyGalleryState
+                }
+                error={new Error('Sample exam data could not be loaded.')}
+                examId="7"
+                threshold={3}
+                holders={[
+                  { address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', keyRegistered: true },
+                  { address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', keyRegistered: true },
+                  { address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', keyRegistered: true },
+                  { address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', keyRegistered: ceremonyGalleryState !== 'blocked' },
+                  { address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', keyRegistered: true },
+                ]}
+                stepStatuses={
+                  ceremonyGalleryState === 'complete'
+                    ? Array.from({ length: 6 }, () => 'complete')
+                    : ceremonyGalleryState === 'failed'
+                      ? ['complete', 'complete', 'complete', 'error', 'pending', 'pending']
+                      : Array.from({ length: 6 }, () => 'pending')
+                }
+                isComplete={ceremonyGalleryState === 'complete'}
+                failureMessage={ceremonyGalleryState === 'failed' ? 'Encrypted share upload failed. Retry the failed step.' : null}
+                disabledReason={ceremonyGalleryState === 'blocked' ? 'Every assigned holder must have a registered encryption key.' : null}
+                onRun={() => setCeremonyGalleryState('complete')}
               />
             </div>
           </div>

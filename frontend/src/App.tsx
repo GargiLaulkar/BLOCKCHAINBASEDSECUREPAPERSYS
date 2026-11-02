@@ -6,6 +6,8 @@ import { ComponentGallery } from "./gallery/ComponentGallery";
 import { Button } from "@sigil/ui";
 import { ParticipantsContainer } from "./pages/participants/ParticipantsContainer";
 import { DocketContainer } from "./pages/docket/DocketContainer";
+import { CreateExamContainer } from "./pages/create-exam/CreateExamContainer";
+import { KeyCeremonyContainer } from "./pages/key-ceremony/KeyCeremonyContainer";
 
 type ApiStatus = "checking" | "online" | "offline";
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:4000";
@@ -118,6 +120,22 @@ export function App() {
             element={
               <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
                 <DocketContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/authority/create"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
+                <CreateExamContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/authority/exams/:examId/ceremony"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
+                <KeyCeremonyContainer />
               </AppShell>
             }
           />

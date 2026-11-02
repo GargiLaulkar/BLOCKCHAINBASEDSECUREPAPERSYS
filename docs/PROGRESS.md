@@ -61,7 +61,9 @@ Current verification (2026-10-18 / 2026-10-19): migration deploy and reset passe
 | FA-03 | Signature components: CustodyBubbles, Coupon, Rosette (`rosettePath`), Serial, HashChip, ThresholdMeter, CountdownLock, LedgerTable, TxDrawer, StateStamp | Completed | Vitest determinism & snapshot tests pass (5/5); all components rendered in `/dev/gallery` |
 | FA-04 | App shell: top bar, SIWE authentication, MetaMask integration, useAuthGuard, four guard screens, TxDrawer wiring | Completed | Top bar layout matches UI reference, 4 guard screens tested, role-aware nav tested, zero storage of keys |
 | FA-08 | Contract error decoder to plain-language messages without apologies | Completed | Covers all section 7.4 & ExamVault.sol custom errors, table-driven unit tests pass (34/34 in frontend) |
-| FA-05 | Admin participants and Authority docket | In Progress | Member 5 FB-01 merged locally; implementing pages |
+| FA-05 | Admin participants and Authority docket | Completed | Live-data pages use the merged FB-01 hooks; targeted and full frontend checks passed |
+| FA-06 | Create Exam wizard and Key Ceremony | Implemented; owner follow-up required | Six-step wizard and ceremony screen implemented with generated API types, chain reads, TxDrawer transactions, and sample-only gallery states. See HANDOFF for the core zeroization limitation and contract ABI ICR. |
+| FA-07 | Exam command centre | In Progress | |
 
 ## Frontend B (Member 5) – FB-01 Data Hooks
 
