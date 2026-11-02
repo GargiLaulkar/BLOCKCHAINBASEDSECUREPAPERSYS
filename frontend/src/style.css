@@ -293,3 +293,50 @@ footer {
   flex: 1;
   padding: var(--sigil-space-6) 0;
 }
+
+@media (max-width: 640px) {
+  .participants-page-header,
+  .docket-page-header {
+    align-items: stretch !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .participants-page-header > .sigil-button,
+  .docket-page-header > .sigil-button {
+    align-self: flex-start;
+    min-height: 44px;
+  }
+
+  .participants-role-filter {
+    align-items: flex-start !important;
+  }
+
+  .participants-role-filter button,
+  .docket-state-filter button {
+    min-height: 44px;
+    padding-bottom: 8px !important;
+    padding-top: 8px !important;
+  }
+
+  .participants-actions button {
+    height: auto !important;
+    min-height: 44px;
+    padding: 8px 10px !important;
+  }
+
+  .docket-filters {
+    justify-content: flex-start !important;
+  }
+
+  .docket-search {
+    flex: 1 1 100%;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .docket-search input {
+    height: 44px !important;
+    width: 100%;
+  }
+}

@@ -259,7 +259,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
 
   return (
     <div className="sigil-page-container" style={{ padding: '32px 0', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="docket-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--sigil-color-ink)' }}>
             Examination docket
@@ -276,6 +276,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
       </div>
 
       <div
+        className="docket-filters"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -287,7 +288,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
           paddingBottom: '14px',
         }}
       >
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div className="docket-state-filter" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)', fontWeight: 600 }}>
             State:
           </span>
@@ -317,7 +318,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
           })}
         </div>
 
-        <div style={{ minWidth: '220px' }}>
+        <div className="docket-search" style={{ minWidth: '220px' }}>
           <input
             type="search"
             placeholder="Search serial, title..."

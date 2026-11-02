@@ -507,16 +507,16 @@ export function ComponentGallery() {
             <div style={{ background: 'var(--sigil-color-sheet)', padding: '16px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px' }}>
               <h3 style={{ fontSize: '15px', marginBottom: '12px' }}>Buttons</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <Button variant="primary">Primary ink</Button>
                   <Button variant="secondary">Secondary outline</Button>
                   <Button variant="ghost">Ghost</Button>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <Button variant="alert">Alert action</Button>
                   <Button variant="primary" disabled>Disabled</Button>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <Button size="sm">Small (28px)</Button>
                   <Button size="md">Medium (38px)</Button>
                   <Button size="lg">Large (46px)</Button>
@@ -654,9 +654,9 @@ export function ComponentGallery() {
 
           {/* CustodyBubbles */}
           <div style={{ background: 'var(--sigil-color-sheet)', padding: '20px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px', marginTop: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
               <h3 style={{ fontSize: '15px', margin: 0 }}>CustodyBubbles (horizontal strip & compact inline)</h3>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '13px', color: 'var(--sigil-color-slate)' }}>Preview state:</span>
                 {(['Draft', 'Collecting', 'Sealed', 'Released', 'Concluded', 'Cancelled'] as ExamState[]).map((st) => (
                   <Button
@@ -680,7 +680,7 @@ export function ComponentGallery() {
             </div>
 
             {/* Inline docket variant */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '13px', color: 'var(--sigil-color-slate)' }}>Compact inline variant (for table rows):</span>
               <CustodyBubbles currentState={bubbleState} variant="inline" />
               <StateStamp state={bubbleState} />
@@ -748,9 +748,9 @@ export function ComponentGallery() {
             {/* ThresholdMeter & CountdownLock */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ background: 'var(--sigil-color-sheet)', padding: '16px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                   <h3 style={{ fontSize: '15px', margin: 0 }}>ThresholdMeter (square notches)</h3>
-                  <div style={{ display: 'flex', gap: '4px' }}>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <Button
                         key={n}
@@ -850,9 +850,9 @@ export function ComponentGallery() {
 
           {/* TxDrawer States */}
           <div style={{ marginTop: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '15px', margin: 0 }}>TxDrawer (transaction lifecycle drawer)</h3>
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {(['preparing', 'awaiting-signature', 'pending', 'confirmed', 'failed'] as TxStatus[]).map((st) => (
                   <Button
                     key={st}
@@ -939,7 +939,7 @@ export function ComponentGallery() {
 
           {/* Sub-section 1: Admin Participants */}
           <div style={{ marginTop: '24px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px', padding: '24px', background: 'var(--sigil-color-sheet)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
               <div>
                 <h3 style={{ fontSize: '16px', margin: '0 0 4px 0', color: 'var(--sigil-color-ink)' }}>
                   1. Admin participants page states
@@ -948,7 +948,7 @@ export function ComponentGallery() {
                   Ledger table with role filter, register participant dialog, and revoke confirmation Coupon.
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {(['populated', 'loading', 'empty', 'error', 'permission'] as const).map((st) => (
                   <button
                     key={st}
@@ -995,7 +995,7 @@ export function ComponentGallery() {
 
           {/* Sub-section 2: Authority Docket */}
           <div style={{ marginTop: '32px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px', padding: '24px', background: 'var(--sigil-color-sheet)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
               <div>
                 <h3 style={{ fontSize: '16px', margin: '0 0 4px 0', color: 'var(--sigil-color-ink)' }}>
                   2. Authority exam docket page states
@@ -1004,7 +1004,7 @@ export function ComponentGallery() {
                   Serial (No. 0007), title, inline custody bubbles, release window, and panel threshold.
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {(['populated', 'loading', 'empty', 'error', 'permission'] as const).map((st) => (
                   <button
                     key={st}

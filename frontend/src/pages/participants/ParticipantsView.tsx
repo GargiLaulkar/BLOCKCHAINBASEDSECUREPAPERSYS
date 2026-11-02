@@ -190,7 +190,7 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
       header: 'Actions',
       align: 'right',
       render: (row) => (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+        <div className="participants-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
           {row.roles.map((r) => (
             <Button
               key={r}
@@ -303,7 +303,7 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
   return (
     <div className="sigil-page-container" style={{ padding: '32px 0', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="participants-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--sigil-color-ink)' }}>
             Participant registry
@@ -319,8 +319,10 @@ export const ParticipantsView: React.FC<ParticipantsViewProps> = ({
 
       {/* Role Filter Bar */}
       <div
+        className="participants-role-filter"
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           gap: '8px',
           alignItems: 'center',
           marginBottom: '16px',
