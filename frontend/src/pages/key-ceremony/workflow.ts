@@ -40,5 +40,5 @@ export async function runCeremonyWorkflow(input: CeremonyWorkflowInput): Promise
   input.onStep(4, 'active');
   await input.openCollection(prepared.examPublicKey);
   input.onStep(4, 'complete');
-  input.onStep(5, 'complete');
+  input.onStep(5, 'pending');
 }

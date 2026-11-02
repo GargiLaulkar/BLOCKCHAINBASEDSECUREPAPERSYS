@@ -131,7 +131,7 @@ describe('FA-06b: Key Ceremony', () => {
       [3, 'complete'],
       [4, 'active'],
       [4, 'complete'],
-      [5, 'complete'],
+      [5, 'pending'],
     ]);
   });
 
@@ -159,10 +159,11 @@ describe('FA-06b: Key Ceremony', () => {
 
     renderCeremony({
       isComplete: true,
-      stepStatuses: Array.from({ length: 6 }, () => 'complete'),
+      stepStatuses: ['complete', 'complete', 'complete', 'complete', 'complete', 'pending'],
     });
     expect(document.body).not.toHaveTextContent(privateKeySentinel);
-    expect(screen.getByText(/did not return the private key to this screen/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not confirm that its internal secret buffers were wiped/i)).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
   });
 
   it('retries upload without regenerating the exam key and skips upload after it succeeds', async () => {

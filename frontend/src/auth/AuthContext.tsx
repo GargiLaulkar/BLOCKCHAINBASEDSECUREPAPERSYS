@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { decodeContractError } from '../utils/errors';
 
 export type SystemRole = 'ADMIN' | 'AUTHORITY' | 'SETTER' | 'HOLDER' | 'CENTRE' | 'AUDITOR';
@@ -30,6 +31,8 @@ const TARGET_CHAIN_ID_HEX = '0x7a69';
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? 'http://localhost:4000';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pathname } = useLocation();
+  const isGalleryRoute = pathname === '/dev/gallery';
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -60,13 +63,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    if (isGalleryRoute) {
+      return;
+    }
     void fetchChainHealth();
     const interval = setInterval(fetchChainHealth, 10000);
     return () => clearInterval(interval);
-  }, [fetchChainHealth]);
+  }, [fetchChainHealth, isGalleryRoute]);
 
   // Check active SIWE session with backend
   const checkCurrentSession = useCallback(async () => {
+    if (isGalleryRoute) {
+      setIsAuthenticated(false);
+      setRoles([]);
+      return;
+    }
     try {
       const res = await fetch(`${apiOrigin}/api/auth/me`, {
         credentials: 'include',
@@ -88,11 +99,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(false);
       setRoles([]);
     }
-  }, [account]);
+  }, [account, isGalleryRoute]);
 
   useEffect(() => {
+    if (isGalleryRoute) {
+      return;
+    }
     void checkCurrentSession();
-  }, [checkCurrentSession]);
+  }, [checkCurrentSession, isGalleryRoute]);
 
   // MetaMask integration
   useEffect(() => {

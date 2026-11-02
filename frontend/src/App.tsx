@@ -8,6 +8,7 @@ import { ParticipantsContainer } from "./pages/participants/ParticipantsContaine
 import { DocketContainer } from "./pages/docket/DocketContainer";
 import { CreateExamContainer } from "./pages/create-exam/CreateExamContainer";
 import { KeyCeremonyContainer } from "./pages/key-ceremony/KeyCeremonyContainer";
+import { CommandCentreContainer } from "./pages/command-centre/CommandCentreContainer";
 
 type ApiStatus = "checking" | "online" | "offline";
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:4000";
@@ -86,8 +87,8 @@ function HomeView() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           <Route
             path="/dev/gallery"
@@ -140,6 +141,14 @@ export function App() {
             }
           />
           <Route
+            path="/authority/exams/:examId"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
+                <CommandCentreContainer />
+              </AppShell>
+            }
+          />
+          <Route
             path="/docket"
             element={
               <AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}>
@@ -156,7 +165,7 @@ export function App() {
             }
           />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

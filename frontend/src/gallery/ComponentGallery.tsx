@@ -39,6 +39,11 @@ import { ParticipantRecord, ParticipantRole } from '../pages/participants/types'
 import { DocketExam } from '../pages/docket/types';
 import { CreateExamView } from '../pages/create-exam/CreateExamView';
 import { KeyCeremonyView } from '../pages/key-ceremony/KeyCeremonyView';
+import { CommandCentreView } from '../pages/command-centre/CommandCentreView';
+import type {
+  CommandCentreExam,
+  CommandCentreReadinessRow,
+} from '../pages/command-centre/types';
 import { timestampInputValue } from '../pages/create-exam/validation';
 import type { ExamWizardContext, ExamWizardDraft } from '../pages/create-exam/types';
 
@@ -101,6 +106,15 @@ export function ComponentGallery() {
   const [ceremonyGalleryState, setCeremonyGalleryState] = useState<
     'ready' | 'loading' | 'empty' | 'error' | 'permission' | 'blocked' | 'failed' | 'complete'
   >('ready');
+  const [commandCentrePageState, setCommandCentrePageState] = useState<
+    'ready' | 'loading' | 'empty' | 'error' | 'permission'
+  >('ready');
+  const [commandCentreExamState, setCommandCentreExamState] = useState<
+    'Draft' | 'Collecting' | 'Sealed' | 'Released' | 'Concluded' | 'Cancelled'
+  >('Collecting');
+  const [commandCentreSealState, setCommandCentreSealState] = useState<
+    'quota' | 'randomness' | 'ready'
+  >('quota');
 
   const sampleChainTime = Math.floor(Date.now() / 1000);
   const wizardSampleDraft: ExamWizardDraft = {
@@ -134,6 +148,80 @@ export function ComponentGallery() {
     chainTime: sampleChainTime,
     minLeadSeconds: 60,
   };
+  const commandCentreMetaHash = '0x8f2d591c0e7b4a2e6f3d1a8c5b7e9f0a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e';
+  const commandCentreBankHash = '0x5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b';
+  const commandCentreExam: CommandCentreExam = {
+    examId: '7',
+    title: 'Regional Physics Examination',
+    state: commandCentreExamState,
+    metaHash: commandCentreMetaHash,
+    bankHash: ['Sealed', 'Released', 'Concluded'].includes(commandCentreExamState)
+      ? commandCentreBankHash
+      : null,
+    rosetteHash: ['Sealed', 'Released', 'Concluded'].includes(commandCentreExamState)
+      ? commandCentreBankHash
+      : commandCentreMetaHash,
+    releaseOpensAt: sampleChainTime + 1_800,
+    examStartsAt: sampleChainTime + 5_400,
+    examEndsAt: commandCentreExamState === 'Released'
+      ? sampleChainTime - 3_600
+      : sampleChainTime + 10_800,
+    threshold: 2,
+    holderCount: 3,
+  };
+  const commandCentreReadinessRows: CommandCentreReadinessRow[] = [
+    {
+      address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+      role: 'Holder',
+      keyRegistered: 'complete',
+      shareVerified: 'not-tracked',
+      randomnessCommitted: 'complete',
+      batchesSubmitted: 'not-applicable',
+      batchCount: null,
+    },
+    {
+      address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+      role: 'Holder',
+      keyRegistered: 'complete',
+      shareVerified: 'not-tracked',
+      randomnessCommitted: commandCentreSealState === 'randomness' ? 'pending' : 'complete',
+      batchesSubmitted: 'not-applicable',
+      batchCount: null,
+    },
+    {
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+      role: 'Holder',
+      keyRegistered: 'complete',
+      shareVerified: 'not-tracked',
+      randomnessCommitted: 'complete',
+      batchesSubmitted: 'not-applicable',
+      batchCount: null,
+    },
+    {
+      address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
+      role: 'Setter',
+      keyRegistered: 'not-applicable',
+      shareVerified: 'not-applicable',
+      randomnessCommitted: 'not-applicable',
+      batchesSubmitted: 'complete',
+      batchCount: 4,
+    },
+  ];
+  const commandCentreSections = [
+    {
+      name: 'Physics',
+      quota: 45,
+      questionCount: commandCentreSealState === 'quota' ? 38 : 45,
+    },
+    { name: 'Chemistry', quota: 40, questionCount: 40 },
+  ];
+  const commandCentreSealReason = commandCentreExamState !== 'Collecting'
+    ? 'Seal exam is available only while collection is open.'
+    : commandCentreSealState === 'quota'
+      ? 'Seal needs 45 Physics questions; the bank has 38.'
+      : commandCentreSealState === 'randomness'
+        ? 'Seal needs randomness commitments from every key holder.'
+        : null;
 
   const gallerySampleParticipants: ParticipantRecord[] = [
     {
@@ -966,7 +1054,7 @@ export function ComponentGallery() {
             Sample records below exist only in this gallery. Open the step list to inspect each wizard form.
           </p>
 
-          <div style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+          <div data-testid="create-exam-gallery" style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ marginBottom: '4px' }}>Create Exam wizard</h3>
@@ -1028,7 +1116,7 @@ export function ComponentGallery() {
             </div>
           </div>
 
-          <div style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+          <div data-testid="key-ceremony-gallery" style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ marginBottom: '4px' }}>Key Ceremony</h3>
@@ -1071,17 +1159,15 @@ export function ComponentGallery() {
                 }
                 error={new Error('Sample exam data could not be loaded.')}
                 examId="7"
-                threshold={3}
+                threshold={2}
                 holders={[
                   { address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', keyRegistered: true },
                   { address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', keyRegistered: true },
                   { address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', keyRegistered: true },
-                  { address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', keyRegistered: ceremonyGalleryState !== 'blocked' },
-                  { address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', keyRegistered: true },
                 ]}
                 stepStatuses={
                   ceremonyGalleryState === 'complete'
-                    ? Array.from({ length: 6 }, () => 'complete')
+                    ? ['complete', 'complete', 'complete', 'complete', 'complete', 'pending']
                     : ceremonyGalleryState === 'failed'
                       ? ['complete', 'complete', 'complete', 'error', 'pending', 'pending']
                       : Array.from({ length: 6 }, () => 'pending')
@@ -1090,6 +1176,122 @@ export function ComponentGallery() {
                 failureMessage={ceremonyGalleryState === 'failed' ? 'Encrypted share upload failed. Retry the failed step.' : null}
                 disabledReason={ceremonyGalleryState === 'blocked' ? 'Every assigned holder must have a registered encryption key.' : null}
                 onRun={() => setCeremonyGalleryState('complete')}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="fa-07-command-centre" style={{ borderTop: '1px solid var(--sigil-color-hairline)', paddingTop: '32px' }}>
+          <h2>FA-07: Exam command centre page states</h2>
+          <p style={{ color: 'var(--sigil-color-slate)' }}>
+            Sample exam and readiness records below are for gallery inspection only. Custody state is chain-derived on the operational route.
+          </p>
+
+          <div data-testid="command-centre-gallery" style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
+            <h3 style={{ marginBottom: '8px' }}>Page state</h3>
+            <div data-testid="command-centre-page-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+              {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setCommandCentrePageState(state)}
+                  aria-pressed={commandCentrePageState === state}
+                  style={{
+                    border: '1px solid',
+                    borderColor: commandCentrePageState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                    background: commandCentrePageState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: commandCentrePageState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    fontSize: '11px',
+                    fontFamily: 'var(--sigil-font-mono)',
+                    padding: '4px 8px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+
+            <h3 style={{ marginBottom: '8px' }}>On-chain exam state</h3>
+            <div data-testid="command-centre-chain-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+              {(['Draft', 'Collecting', 'Sealed', 'Released', 'Concluded', 'Cancelled'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setCommandCentreExamState(state)}
+                  aria-pressed={commandCentreExamState === state}
+                  style={{
+                    border: '1px solid',
+                    borderColor: commandCentreExamState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                    background: commandCentreExamState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: commandCentreExamState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    fontSize: '11px',
+                    fontFamily: 'var(--sigil-font-mono)',
+                    padding: '4px 8px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+
+            <h3 style={{ marginBottom: '8px' }}>Seal prerequisite</h3>
+            <div data-testid="command-centre-seal-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+              {(['quota', 'randomness', 'ready'] as const).map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  onClick={() => setCommandCentreSealState(state)}
+                  aria-pressed={commandCentreSealState === state}
+                  style={{
+                    border: '1px solid',
+                    borderColor: commandCentreSealState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-hairline)',
+                    background: commandCentreSealState === state ? 'var(--sigil-color-ink)' : 'var(--sigil-color-sheet)',
+                    color: commandCentreSealState === state ? 'var(--sigil-color-sheet)' : 'var(--sigil-color-ink)',
+                    fontSize: '11px',
+                    fontFamily: 'var(--sigil-font-mono)',
+                    padding: '4px 8px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {state}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ background: 'var(--sigil-color-mist)', padding: '12px' }}>
+              <CommandCentreView
+                pageState={commandCentrePageState}
+                error={new Error('Sample command-centre request failed.')}
+                exam={commandCentreExam}
+                countdownTarget={
+                  commandCentreExamState === 'Released'
+                    ? commandCentreExam.examEndsAt
+                    : commandCentreExam.releaseOpensAt
+                }
+                readinessRows={commandCentreReadinessRows}
+                sectionCounts={commandCentreSections}
+                sealDisabledReason={
+                  commandCentreSealState === 'ready'
+                    ? commandCentreExamState === 'Collecting'
+                      ? null
+                      : 'Seal exam is available only while collection is open.'
+                    : commandCentreSealReason
+                }
+                concludeDisabledReason={
+                  commandCentreExamState === 'Released'
+                    ? null
+                    : 'Conclude exam is available only after the exam is released.'
+                }
+                actionError={commandCentrePageState === 'error' ? 'The sample transaction failed.' : null}
+                onRetry={() => setCommandCentrePageState('ready')}
+                onSeal={() => undefined}
+                onConclude={() => undefined}
+                onCancel={() => undefined}
               />
             </div>
           </div>

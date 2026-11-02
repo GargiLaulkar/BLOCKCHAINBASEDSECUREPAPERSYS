@@ -232,7 +232,7 @@ export const DocketContainer: React.FC = () => {
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       onCreateExam={() => navigate('/authority/create')}
-      onRowClick={(exam) => navigate(`/exams/${exam.examId}`)}
+      onRowClick={(exam) => navigate(`/authority/exams/${exam.examId}`)}
       onRetry={() => void retry()}
     />
     </>

@@ -139,7 +139,7 @@ export function KeyCeremonyView({
           )}
           {isComplete && (
             <p className="key-ceremony__complete" role="status">
-              Ceremony complete. @sigil/core did not return the private key to this screen; no private key was sent or stored.
+              Collection is open. @sigil/core did not return the private key to this screen, and no private key was sent or stored. This version of @sigil/core does not confirm that its internal secret buffers were wiped.
             </p>
           )}
 
