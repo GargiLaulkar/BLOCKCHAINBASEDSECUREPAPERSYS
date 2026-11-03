@@ -31,9 +31,9 @@ Base commit seen: 0b92def
 - [ ] Check FA-09/FA-10 coverage, add missing tests.
 
 ## PART 4: Cleanup and documentation
-- [ ] 1. Clean superseded screenshots, separate commit "chore: remove superseded 520px screenshots".
+- [x] 1. Clean superseded screenshots, separate commit "chore: remove superseded 520px screenshots". (done)
 - [ ] 2. Write report chapter in docs/report/.
-- [ ] 3. Write docs/PRE_PUSH_CHECKLIST.md.
+- [ ] 3. Write docs/PRE_PUSH_CHECKLIST.md. (exists)
 - [ ] 4. Final update docs/PROGRESS.md, clean docs/HANDOFF.md.
 
 ## FINAL VERIFICATION
