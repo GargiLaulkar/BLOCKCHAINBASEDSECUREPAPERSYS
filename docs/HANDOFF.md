@@ -11,7 +11,7 @@
 
 ## Privacy and memory guarantees
 
-Section 5 phase 5 intentionally publishes a holder's plaintext share on-chain through the `submitShare` transaction at release time. This single release-time transaction is the only time a share leaves the browser; it is a protocol action, not an item awaiting owner confirmation. The share, passphrase, private key, and reveal are not sent to the metadata/share API or browser storage.
+Section 5 phase 5 intentionally publishes a holder's plaintext share on-chain through the `submitShare` transaction at release time. This single transaction at release time is the only place a share leaves the browser; it is a protocol action by design (section 5 phase 5), not an item awaiting owner confirmation. The share, passphrase, private key, and reveal are not sent to the metadata/share API or browser storage.
 
 Frontend cleanup is best-effort JavaScript cleanup: component references and passphrase fields are cleared, byte buffers are overwritten where available, and JWK scalar strings are replaced. JavaScript engines and `@sigil/core` may retain copies or internal buffers; physical zeroization cannot be guaranteed until the core ceremony path is corrected and the browser runtime provides stronger guarantees.
 
