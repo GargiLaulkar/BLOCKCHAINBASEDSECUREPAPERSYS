@@ -5,10 +5,10 @@ Branch: member4/design-system
 Base commit seen: 0b92def
 
 ## STEP A: Real state before touching anything
-- [x] 1a. git status, git log --oneline -12, git diff --stat; identify commits/uncommitted since 0b92def (done - see git output)
-- [ ] 1b. Inspect uncommitted changes; if coherent + pass typecheck -> commit as "WIP FA-11: recover previous agent work"; if broken/half-written -> fix/finish
-- [x] 2. Check existence: docs/PROMPT5_PROGRESS.md (created), docs/AUDIT_MEMBER4.md (exists), docs/PRE_PUSH_CHECKLIST.md (exists), docs/report/ (exists), axe test/script (verify-gallery-responsive.mjs uses puppeteer/axe?), CSP in prod build (vite.config.ts has CSP), cleanup of old screenshots (to do)
-- [ ] 3. pnpm install, baseline tests/typecheck/build for packages/ui and frontend (ignore contracts lint/typecheck failures; core tests may timeout - rerun alone)
+- [x] 1a. git status, git log --oneline -12, git diff --stat; identify commits/uncommitted since 0b92def (done - committed previous work as WIP FA-11)
+- [x] 1b. Inspect uncommitted changes; if coherent + pass typecheck -> commit as "WIP FA-11: recover previous agent work"; if broken/half-written -> fix/finish (committed)
+- [x] 2. Check existence: docs/PROMPT5_PROGRESS.md (created), docs/AUDIT_MEMBER4.md (exists), docs/PRE_PUSH_CHECKLIST.md (exists), docs/report/ (exists), axe test/script (verify-gallery-responsive.mjs uses axe-core), CSP in prod build (vite.config.ts has CSP), cleanup of old screenshots (to do - 29 superseded non-prefixed files found)
+- [x] 3. pnpm install done; baseline: ui typecheck ok, frontend typecheck ok, ui tests 5/5, frontend tests 171/171, core tests 17/17, frontend build ok
 - [ ] 4. List ambiguities with assumed answers, continue only with what's missing
 
 ## PART 1: Design match
