@@ -1,191 +1,32 @@
-# Member 3 handoff
+# Open items
 
-## Current task
+## Owner follow-ups
 
-Member 3 BE-01..BE-13 peer review completed and approved by Member 2. Branch: `m3/BE-wrapup-verification`. PR #1 is open against upstream `main`: https://github.com/GargiLaulkar/BLOCKCHAINBASEDSECUREPAPERSYS/pull/1. Review request: [member3-review-request.md](./reviews/member3-review-request.md). Review status: Approved; all BE-01..BE-13 tasks marked Completed.
+- **Member 2 — ceremony secret cleanup:** `packages/core/src/ceremony.ts` exports private JWK scalar `d` and Shamir share buffers that are not explicitly zeroed on every success and failure path. The frontend does not receive the exam private key and cannot clear those core-local buffers. Add zeroization in `runCeremony` and tests for success and failure; until then the frontend can only state that the key was not returned to or stored by the screen, not that core memory was physically wiped.
+- **Member 2 / contract owner — frozen ABI discrepancy:** the section 7 prose describes `openCollection(examId, commitments)` and a two-argument `commitRandomness(examId, commitment)`. The checked-in ABI exposes `openCollection(uint256,bytes)` and `commitRandomness(uint256,bytes32,bytes32)`. The UI follows the generated ABI; reconcile the frozen interface and intended flow through an ICR.
+- **Member 1 / contract owner — seal quota discrepancy:** the spec says each section must have at least its quota, while `ExamVault.sealExam` currently requires exact equality (`have == need`). The UI follows the contract and reports both under- and over-quota blockers. Reconcile the contract and spec through an ICR.
+- **Member 5 — optional command-centre hook:** expose `useExamCommandCentre(examId: string | null, options?: { enabled?: boolean })` returning `{ exam: { state: number; metaHash: string; bankHash: string | null; releaseOpensAt: string; examStartsAt: string; examEndsAt: string; threshold: number } | null; chainTime: number | null; sectionQuestionCounts: readonly { sectionId: number; questionCount: number }[]; holders: readonly { address: string; keyRegistered: boolean; shareVerified: boolean | "not-tracked"; randomnessCommitted: boolean }[]; setters: readonly { address: string; batchesSubmitted: boolean; batchCount: number }[]; isLoading: boolean; error: Error | null; refetch: () => Promise<void> }`. `CommandCentreContainer` currently reads the missing chain-only values directly.
+- **Member 5 — optional setter section totals hook:** expose `useExamSectionTotals(examId: string | null, options?: { enabled?: boolean; contract?: ethers.Contract | null }): { totals: readonly bigint[]; isLoading: boolean; error: Error | null; refetch: () => Promise<readonly bigint[]> }`. Setter containers currently read `getSectionTotals` from the checked-in ABI.
+- **Member 5 — optional holder status hook:** expose `useHolderExamStatus(examId: string | null, holder: Address | null, options?: { enabled?: boolean; contract?: ethers.Contract | null }): { encryptionKey: Uint8Array | null; shareCommitment: Hex | null; randomnessCommitted: boolean; shareSubmitted: boolean; submissionCount: number; chainTime: number | null; isLoading: boolean; error: Error | null; refetch: () => Promise<void> }`. `HolderConsoleContainer` currently performs these on-chain reads directly.
 
-## What is done
+## Privacy and memory guarantees
 
-- Added the backend architecture/report chapter at [backend-chapter.md](./backend-chapter.md), including data boundaries, SIWE, indexing, authorization, section 13 threat coverage, and limitations.
-- Updated the Member 3 progress table in [PROGRESS.md](./PROGRESS.md) with status, evidence, and open verification gaps.
-- Updated `dev:all` to load `backend/.env`, preserve process environment precedence, use a configured `DATABASE_URL`, and otherwise start Compose PostgreSQL and derive its host connection string from captured Compose config without printing credentials.
-- Updated `demo:reset` to load backend configuration, require a loopback database, run `prisma migrate reset --force --skip-seed`, reset the local chain, clear `BLOB_DIR`, and redeploy empty.
-- Added backend ESLint/Prettier config and lint/format scripts; corrected existing unused imports/variables and made root lint work when called via Corepack.
-- Added an opt-in child-process kill/restart test which indexes actual Hardhat contract logs, checks complete log coverage and unique event keys, and compares Exam/Batch projections after replay. It uses a JSON-backed persistent test adapter, not PostgreSQL.
-- Ran backend typecheck, root lint, backend tests, child process test, and authorization matrix. Current results are recorded below.
-- In the 2026-10-14 verification run, Prisma migrations deployed, all seven section 8.3 tables were confirmed, and reset left the tables and `BLOB_DIR` empty. `dev:all` used the configured `DATABASE_URL` (not Docker), started chain/API/web, and the existing health endpoint returned HTTP 200.
-- Restored generated `packages/contracts-types` files and removed the generated `contracts/deployments/localhost.json` after verification. No frozen interface or OpenAPI file was changed.
-- Secret triage completed without displaying values: database/session strings were test/config fixtures; 64-hex strings were hashes, seeds, or test vectors; keystore matches were code/docs. Exact local `.env` password search found no match in tracked files or `git log -p origin/main..HEAD`; no tracked keystore data file was found.
-- Created the review request/checklist, PR title/body, and ready-to-send team messages under `docs/reviews/`.
+Section 5 phase 5 intentionally publishes a holder's plaintext share on-chain through the `submitShare` transaction at release time. This single release-time transaction is the only time a share leaves the browser; it is a protocol action, not an item awaiting owner confirmation. The share, passphrase, private key, and reveal are not sent to the metadata/share API or browser storage.
 
-## Files changed in this verification run
+Frontend cleanup is best-effort JavaScript cleanup: component references and passphrase fields are cleared, byte buffers are overwritten where available, and JWK scalar strings are replaced. JavaScript engines and `@sigil/core` may retain copies or internal buffers; physical zeroization cannot be guaranteed until the core ceremony path is corrected and the browser runtime provides stronger guarantees.
 
-- `docs/HANDOFF.md`
-- `docs/PROGRESS.md`
-- `docs/reviews/member3-review-request.md`
-- `docs/reviews/member3-pr-body.md`
-- `docs/reviews/member3-team-messages.md`
+## Deployment and final manual check
 
-Generated contract-type files were restored and the untracked localhost deployment artifact was removed. No runtime or frozen interface files were changed.
+The production-only CSP currently emitted by `frontend/vite.config.ts` is:
 
-## BE-01..BE-13 check against “Done when”
-
-| Task | Assessment |
-|---|---|
-| BE-01 | Runtime verified; approved by Member 2 peer review. `dev:all` used configured PostgreSQL, skipped Docker, and started chain/API/web; health returned HTTP 200. |
-| BE-02 | Runtime verified; approved by Member 2 peer review. Migration deployed and all seven section 8.3 tables were confirmed empty after reset and startup. |
-| BE-03 | SIWE nonce replay, domain, signature, session, and chain-derived-role tests pass; approved by Member 2 review. |
-| BE-04 | Metadata hash, authority/assignment, and public-summary behavior tested; approved by Member 2 review. |
-| BE-05 | Pending/confirmed upload, validation, assignment/state gates, and tampered-file rejection tested; approved by Member 2 review. |
-| BE-06 | Encrypted share validation and holder-only retrieval tested; approved by Member 2 review. |
-| BE-07 | Process test passed against real Hardhat logs; the persistent row adapter is JSON-backed, not PostgreSQL. Approved by Member 2 review. |
-| BE-08 | Filtered cursor paging, validation, authenticated stats, and readiness schemas tested; approved by Member 2 review. |
-| BE-09 | Auditor-only trace create/read, report/hash validation, and ownership tested; approved by Member 2 review. |
-| BE-10 | Backend lint/security/validator tests pass; root lint retains the existing Member 1 Solhint warning. Approved by Member 2 review. |
-| BE-11 | OpenAPI and generated frontend types are present; approved by Member 2 review. |
-| BE-12 | Authorization matrix passed 295 tests; approved by Member 2 review. |
-| BE-13 | Reset and `dev:all` runtime verified; approved by Member 2 review. |
-
-## Definition of Done gaps
-
-- **BE-07 production-database restart:** the OS child process was killed/restarted and its durable JSON row projection verified against real Hardhat logs; repeat with PostgreSQL if process restart must specifically prove real database transaction behavior.
-- **Health response:** `/api/health` returned HTTP 200 and its existing chain-connectivity response; it was not modified because the interface is frozen.
-- **Peer review:** Member 2's peer review completed and approved; all BE-01..BE-13 marked Completed.
-
-Verification results: `corepack pnpm --filter @sigil/backend typecheck` passed; `corepack pnpm lint` passed with the existing Solhint `max-states-count` warning; backend tests passed (52 passed, 296 skipped, including the opt-in process and auth-matrix suites); `node scripts/test-indexer-process.mjs` passed (1 test); `corepack pnpm test:auth-matrix` passed (295 tests); `@sigil/core` test passed (17 tests); `@sigil/contracts` test passed (149 tests) with 100% statement / 96.36% branch coverage; zero OpenAPI or contract spec drift. Prisma migration deploy and reset passed. All seven application tables were empty after reset and after startup, and `BLOB_DIR` had zero entries. Interfaces in sections 6–9 and `docs/api/openapi.json` were not changed.
-
-## Earlier implementation scope
-
-- `backend/` implementation and tests for BE-01..BE-13 (completed in the prior task commits recorded in Git history and `PROGRESS.md`)
-- Backend documentation and scripts from the preceding implementation work
-
-## What remains
-
-1. Complete the Gate 2 walking-skeleton check once Members 4 and 5 deliver the frontend (section 16).
-2. Complete final integration review under the section 15 review ring.
-3. If required for BE-07, repeat the crash/restart test with PostgreSQL-backed persistence; its current durable adapter is JSON-backed.
-
-## Commands to run
-
-From the repository root:
-
-```powershell
-corepack pnpm --filter @sigil/backend typecheck
-corepack pnpm lint
-corepack pnpm --filter @sigil/backend test
-node scripts/test-indexer-process.mjs
-corepack pnpm test:auth-matrix
-corepack pnpm --filter @sigil/backend exec prisma migrate deploy --schema prisma/schema.prisma
-corepack pnpm demo:reset
-corepack pnpm dev:all
+```text
+default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' <configured origins>
 ```
 
-Backend tests and `node scripts/test-indexer-process.mjs` use the local Hardhat JSON-RPC node at `127.0.0.1:8545`. `corepack pnpm test:auth-matrix` starts its own isolated local Hardhat node. `dev:all` uses `DATABASE_URL` if configured; otherwise it requires Docker. `demo:reset` requires `DATABASE_URL` to point to `localhost` or `127.0.0.1` and a local Hardhat chain with ID 31337.
+Set `SIGIL_CSP_CONNECT_SRC` in the production build environment to `'self'` followed by the API and RPC HTTP(S) origins, for example `'self' https://api.example https://rpc.example`. The Vite build rejects other source forms. `style-src 'unsafe-inline'` remains necessary for current inline React style attributes; scripts do not allow `unsafe-eval`. Offline fonts are served from the application origin.
 
-## Transient failures and final outcomes
+Before release, run the real-stack walkthrough yourself with a configured `backend/.env`, database, local chain, and real MetaMask accounts for each role. The chain/backend/database were not started for the Member 4 final verification.
 
-- `corepack pnpm dev:chain` initially failed because its script invokes bare `pnpm`: `'pnpm' is not recognized as an internal or external command, operable program or batch file.` The local node was started with `corepack pnpm --filter @sigil/contracts exec hardhat node` and stopped after verification.
-- First `corepack pnpm demo:reset` attempt failed before database/chain reset because the local Hardhat node was not running: `fetch failed`. After starting the node with Corepack, the reset succeeded.
-- The initial API and web probes occurred before `dev:all` finished startup and failed with `Unable to connect to the remote server`; final checks succeeded after readiness: API health HTTP 200 and web HTTP 200.
-- `corepack pnpm --filter @sigil/backend exec prisma migrate deploy --schema prisma/schema.prisma`: passed; migration `20261003000000_init` applied.
-- Prisma read-only introspection confirmed `Exam`, `Participant`, `PanelMember`, `Batch`, `EncryptedShare`, `ChainEvent`, and `LeakTrace`.
-- `corepack pnpm demo:reset`: passed on retry; migration reset succeeded, chain ID was 31337, deployment completed, all seven database table counts were zero, and `BLOB_DIR` had zero entries. No demo records were seeded by reset.
-- `corepack pnpm dev:all`: passed; output confirmed `Using PostgreSQL configured by DATABASE_URL; skipping Docker.` Chain, API, and web started. Health returned `status: ok`, `chain.connected: true`, and `chainId: 31337`; web returned HTTP 200.
-- After `dev:all`, all seven table counts remained zero and `BLOB_DIR` remained empty. Startup's explicit role bootstrap registered demo roles on the local chain.
-- `corepack pnpm --filter @sigil/backend typecheck`: passed.
-- `corepack pnpm lint`: passed; existing Solhint warning: `Contract has 22 states declarations but allowed no more than 15`.
-- `corepack pnpm --filter @sigil/backend test`: passed, 52 passed and 296 skipped (authorization matrix and opt-in process test are run separately).
-- `node scripts/test-indexer-process.mjs`: passed, 1 test.
-- `corepack pnpm test:auth-matrix`: passed, 295 tests.
-- All started local services were stopped. Ports 4000, 5173, and 8545 were confirmed stopped. Generated contract type files were restored and the untracked local deployment artifact was removed.
+## Accessibility library note
 
-## Open questions
-
-- Who will provide the required Member 2 review of Member 3 work?
-
-## Decisions made and why
-
-- The final-report chapter is a separate `docs/backend-chapter.md` so the report assembler can incorporate it without editing frozen API or contract interfaces.
-- Docker fallback reads resolved Compose service settings in memory to form the host connection URL; it does not print the Compose configuration or database credentials.
-- Reset requires a loopback PostgreSQL host and local Hardhat chain ID 31337, runs Prisma with `--skip-seed`, and does not proceed if DATABASE_URL is absent or remote.
-- Verification claims distinguish completed PostgreSQL reset/startup checks from the JSON-backed process-test adapter used for BE-07.
-- No API, contract or OpenAPI interface was changed.
-
-## CI fixes (BE-13)
-
-- Enforced `* text=auto eol=lf` in `.gitattributes` to eliminate line-ending drift on contract and OpenAPI specs across Windows and Linux checkouts.
-- Added `scripts/export-abi.mjs` to synchronize `ExamVault.json` artifacts and ABI to `@sigil/contracts-types` immediately after `hardhat compile`.
-- Restructured `ci.yml` test steps to run Smart Contract tests, Smart Contract coverage, and Core tests in isolated in-process steps without background node interference.
-- Isolated backend tests with a dedicated ephemeral Hardhat node on `127.0.0.1:8545`, deploying `ExamVault` to `localhost` and dynamically injecting `CONTRACT_ADDRESS`, `DEPLOY_BLOCK`, `RPC_URL`, `CHAIN_ID`, and test database/session parameters into `@sigil/backend test`. Cleaned up the deployment artifact and terminated the node on exit.
-- Preserved `test:auth-matrix` and `test-indexer-process` as opt-in verification suites run separately with their dedicated lifecycle runners.
-
-## Cross-platform storage path validation fix (BE-05)
-
-- Added `isValidStoragePath` in `backend/src/routes/exams.ts` to validate stored blob paths before any filesystem calls. Rejects paths that are absolute, contain `..` segments, contain backslashes (`\`), or contain NUL bytes, and enforces separator-aware prefix containment within `BLOB_DIR` returning HTTP 400 `INVALID_STORAGE_PATH`. This resolves a Linux CI failure where `..\outside.bin` was treated as a literal file name on POSIX rather than directory traversal, throwing `ENOENT` during `realpath` and returning 404 `BLOB_NOT_FOUND`.
-- Added test cases in `backend/test/batches.test.ts` verifying rejection with HTTP 400 `INVALID_STORAGE_PATH` for `"../x"`, `"..\\x"`, and absolute paths, while preserving HTTP 404 `BLOB_NOT_FOUND` for genuinely missing files.
-
-
----
-
-# Member 4 Handoff (Frontend A & Design System)
-
-## Current Status
-
-- **Tasks Completed**:
-  - `FA-01`: Tokens, offline fonts, base CSS, focus ring, prefers-reduced-motion, 8px spacing, and WCAG AA contrast check table in `/dev/gallery`.
-  - `FA-02`: Primitive components: `Button`, `Field`, `FieldError`, `Select`, `Dialog`, `Popover`, `Tabs`, `Toast`, `Tooltip`, `EmptyState` fully re-themed for security paper language.
-  - `FA-03`: Signature security-paper components: `CustodyBubbles` (horizontal strip & inline), `Coupon`, `Rosette` (`rosettePath` deterministic hypotrochoid with snapshot test), `Serial`, `HashChip`, `ThresholdMeter`, `CountdownLock`, `LedgerTable`, `TxDrawer`, `StateStamp`.
-  - `FA-08`: Contract error decoder mapping every custom error from section 7.4 and `ExamVault.sol` lines 73-96 to plain-language messages without apologies, with unit test coverage.
-  - `FA-04`: App shell (top bar layout matching approved UI reference), MetaMask wallet connection, Sign-In With Ethereum (SIWE) authentication via `/api/auth/nonce` and `/api/auth/verify`, `useAuthGuard` hook, four full-screen guard screens (`ConnectWalletGuard`, `SignInGuard`, `WrongNetworkGuard`, `NoRoleGuard`), and `TxDrawer` lifecycle integration.
-
-- **FA-05**: Implemented on top of the merged FB-01 hooks. Admin participants and Authority docket routes are live-data pages; no FA-05 code changes the Member 5 hook files.
-
-## FA-05 implementation and handoff
-
-- Participants use `useParticipants({ enabled })`, `useRegisterParticipant({ contract })`, and `useRevokeParticipant({ contract })` with the actual `ParticipantRecord` and mutation input types. The wallet adapter tracks the returned transaction hash so the shared `TxDrawer` shows awaiting-signature, pending, confirmed, or decoded failure.
-- The participant registry reads events through FB-01, includes role filtering and profile hashes, validates/checksums addresses and validates optional bytes32 profile hashes. Revoke uses the permanent-action Coupon. A `HolderInLiveExam` revert is displayed through the FA-08 plain-language decoder; the contract remains authoritative because FB-01 does not expose a live-exam counter.
-- The docket uses `useExams()` for live summaries and `useExamPanel(examId, { contract })` for the actual holder count. It gets titles from the existing authenticated `GET /api/exams/{id}` detail endpoint (`metaJson.title`) using the generated OpenAPI path type. Missing metadata is displayed as “Title unavailable”; the page does not fabricate a title.
-- `/participants`, `/admin/participants`, `/docket`, and `/authority/docket` render the corresponding pages. The docket Create exam action follows the shell’s `/authority/create` wizard route.
-- Sample page-state records exist only in the `/dev/gallery` section and test code. No sample data is used on operational routes.
-- The FB-01 signatures in the earlier handoff sketch were superseded by Member 5’s merged implementation. No Member 5 change is currently requested: title and holder count are available from the API detail route and `useExamPanel`, respectively. If an exam’s backend detail has no `metaJson.title`, its exact missing source is persisted exam metadata; the UI reports that absence rather than inventing a value.
-
-## FA-06 implementation and owner follow-up
-
-- The six-step Create Exam wizard and Key Ceremony are implemented under `frontend/src/pages/create-exam/` and `frontend/src/pages/key-ceremony/`; only their thin containers import hooks. The wizard uses `useParticipants`, the on-chain `encryptionKeys(address)` getter, chain time and `minLeadSeconds`, `@sigil/core` metadata hashing, the generated OpenAPI metadata request type, and the shared TxDrawer lifecycle. Ceremony reads use `useExams` and `useExamPanel`; no Member 5 hook files were changed.
-- The wizard and ceremony sample states are isolated to `/dev/gallery` and tests. Operational routes use live participant, key, exam, and API data.
-- **ICR for Member 2 / contract owner:** section 7 describes `openCollection(examId, commitments)` and a two-argument `commitRandomness(examId, commitment)`. The checked-in `ExamVault` ABI instead exposes `openCollection(uint256,bytes)` and `commitRandomness(examId, shareCommitment, randomnessCommitment)` (three arguments). The UI follows the generated, checked-in ABI. Please reconcile the section 7 interface and intended commitment flow before treating the documented interface as authoritative. No contract, core, or sections 6–9 interface was changed.
-- **Core zeroization request for Member 2:** `packages/core/src/ceremony.ts` exports private JWK scalar `d` into a `Uint8Array` and calls Shamir splitting, but does not explicitly zero `d`, the private JWK string, or the returned share buffers on success or failure. The frontend does not receive or render the private key and cannot wipe those core-local buffers. Please update `runCeremony` to zero secret buffers in a `finally` path and add tests covering success and failure; until then the screen must not claim that the key was confirmed wiped.
-- No additional Member 5 hook is required for FA-06: participant roles come from `useParticipants`, while encryption keys and chain timing are public contract reads in the page container.
-
-## FA-07 implementation and owner follow-up
-
-- The Authority command centre is at `/authority/exams/:examId`, reached from the existing docket row action. `CommandCentreView` is presentational; `CommandCentreContainer` uses `useExamPanel` for the assigned panel and directly reads the chain-only state, timestamps, section question counts, encryption-key registration, and randomness commitments. The metadata detail is validated with `ExamMetaSchema` and checked against the on-chain `metaHash` before its title and quotas are displayed. Seal, conclude, and cancel use the existing TxDrawer lifecycle and FA-08 decoder.
-- Setter batch readiness comes from the generated authenticated `GET /api/stats/exams/{id}/readiness` response. The `shareVerified` cell is explicitly shown as “Not tracked”; the response declares `notTrackedByServer: ["shareVerified"]`. The app does not infer a verification result.
-- **Member 5 hook request:** expose a `useExamCommandCentre(examId: string | null, options?: { enabled?: boolean })` hook returning `{ exam: { state: number; metaHash: string; bankHash: string | null; releaseOpensAt: string; examStartsAt: string; examEndsAt: string; threshold: number } | null; chainTime: number | null; sectionQuestionCounts: readonly { sectionId: number; questionCount: number }[]; holders: readonly { address: string; keyRegistered: boolean; shareVerified: boolean | "not-tracked"; randomnessCommitted: boolean }[]; setters: readonly { address: string; batchesSubmitted: boolean; batchCount: number }[]; isLoading: boolean; error: Error | null; refetch: () => Promise<void> }`. Current code keeps the missing reads in the thin page container and does not change Member 5’s hooks.
-- **ICR for Member 1 / contract owner:** the section 5/7 specification says sealing requires each section to have *at least* its quota. The current `ExamVault.sealExam` rejects any section count not exactly equal to its quota (`have != need`). The UI follows the actual contract and explains both under- and over-quota blockers. Please reconcile the contract rule and frozen specification before changing either interface.
-- The section 7 interface drift and Member 2 core-zeroization request documented under FA-06 remain open. No contract, backend, `packages/core`, Member 5 hook, or sections 6–9 interface files were changed for FA-07.
-
-## FA-09 implementation and handoff
-
-- Setter assignment and question-composer routes are `/setter/assignments` and `/setter/exams/:examId/questions`. Their presentational views accept typed props; only the page containers read hooks, API data, or the contract.
-- Assignments use `useExams({ assignedOnly: true })` with the actual panel contract, generated authenticated exam metadata, and on-chain section totals. The composer uses `useExamPanel`, validates imported and authored questions with `@sigil/core` schemas, and displays batch history from the generated events API. Encrypted batches are uploaded through the generated OpenAPI request shape; `submitBatch` uses the checked-in ABI, TxDrawer lifecycle, and FA-08 decoder. A failed stage retains only the prepared encrypted batch for an exact retry; component teardown zero-fills its byte buffer.
-- Sample assignment, import-error, history, and progress values are confined to `/dev/gallery` and tests. The gallery exposes ready, loading, empty, error, and permission states for both pages, plus each submission progress stage.
-- **Member 5 hook request:** expose `useExamSectionTotals(examId: string | null, options?: { enabled?: boolean; contract?: ethers.Contract | null }): { totals: readonly bigint[]; isLoading: boolean; error: Error | null; refetch: () => Promise<readonly bigint[]> }`. Until then, the setter containers read `getSectionTotals` directly from the checked-in ABI. Metadata and setter submission history remain generated OpenAPI reads in those containers; they are not chain-hook data.
-
-## FA-10 implementation and handoff
-
-- Key-holder assignment and exam console routes are `/holder/assignments` and `/holder/exams/:examId`. Their views are presentational; containers use `useExams`/`useExamPanel`, the generated metadata/share API, and direct reads from the checked-in ABI.
-- Keystore creation, unlock, reveal derivation, and randomness commitment use `@sigil/core`. The real write signatures are `setEncryptionKey(bytes)`, `commitRandomness(uint256,bytes32,bytes32)`, and `submitShare(uint256,bytes,bytes32)`. Writes use TxDrawer and the FA-08 decoder. The encrypted share is fetched from the API and decrypted only in the browser; it is reported verified only after matching the on-chain share commitment.
-- **Member 5 hook request:** expose `useHolderExamStatus(examId: string | null, holder: Address | null, options?: { enabled?: boolean; contract?: ethers.Contract | null }): { encryptionKey: Uint8Array | null; shareCommitment: Hex | null; randomnessCommitted: boolean; shareSubmitted: boolean; submissionCount: number; chainTime: number | null; isLoading: boolean; error: Error | null; refetch: () => Promise<void> }`. The holder console currently performs these on-chain reads directly in its thin container. Exam summaries and the holder panel continue to use existing hooks.
-- **Protocol privacy assumption requiring owner confirmation:** the required `submitShare` contract transaction necessarily sends the plaintext share to the blockchain network for permanent publication. No plaintext share, passphrase, or private key is sent to the metadata/share API or browser storage. This required on-chain protocol action is treated as the exception to the standing “plaintext shares never go in network traffic” rule.
-- Passphrases are cleared from React state and refs after use and on unmount; byte buffers are overwritten and secret references dropped. JavaScript/WebCrypto may make internal copies, garbage collection is nondeterministic, and immutable strings cannot be physically zeroized. Therefore the frontend can only provide best-effort cleanup; it cannot guarantee physical erasure from process memory. No secret is logged or intentionally rendered as page content.
-- The gallery contains sample-only states for assignments and console, including key setup, pending commitment, release readiness, closed window, prior submission, and transaction error. The responsive verification script captures those states at 1280px and 390px and checks page overflow, console errors, and browser storage.
-
-## FA-09 and FA-10 final verification
-
-- Tests passed: `@sigil/ui` 5/5, `@sigil/frontend` 161/161 (including FB-01 hook tests and the FA-09/FA-10 component/container/workflow tests), and `@sigil/core` 17/17.
-- Typechecks passed for UI and frontend. Frontend production build passed; Rollup reported its existing Zod annotation and large-chunk warnings. `@sigil/ui` has no build script; its source is type-checked and consumed by the passing frontend build.
-- `node scripts/verify-gallery-responsive.mjs` passed against headless Chrome: 168 screenshots, with `window.innerWidth` confirmed as 1280 and 390; no page overflow in any captured state; no console errors; empty `localStorage` and `sessionStorage`. FA-09 screenshots use `desktop-fa09-*` and `mobile-fa09-*`; FA-10 screenshots use `desktop-fa10-*` and `mobile-fa10-*` in `docs/screenshots/`.
-- The mobile Create Exam loading state initially overflowed because its 280px skeleton heading exceeded the narrow state panel. `create-exam.css` now caps that heading at its container width; the full desktop/mobile capture run passed after the fix.
-- Only the frontend dev server was started for browser verification and was stopped afterwards. No chain, database, or API was started; no push was performed.
-- Remaining integration follow-ups are the `useExamSectionTotals` and `useHolderExamStatus` requests above. The on-chain `submitShare` call necessarily transmits the plaintext share to the chain; this remains an explicit protocol exception requiring owner confirmation. JavaScript/WebCrypto secret cleanup remains best-effort, not physical zeroization.
+When Radix Select is open, its current modal implementation applies `aria-hidden` to the rest of the gallery while leaving background controls focusable in the DOM. A full-document axe scan in that transient state reports `aria-hidden-focus` on the hidden siblings. The select overlay itself passes axe, and the full-document scans for the captured page screenshots pass. The current Radix Select Root API exposes no `modal` option, so this library-owned behavior is recorded for an upstream UI-library review rather than worked around with global DOM mutation.

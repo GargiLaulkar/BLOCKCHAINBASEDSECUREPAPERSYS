@@ -6,7 +6,7 @@ import './setter.css';
 function AssignmentState({ pageState, error, onRetry }: Pick<SetterAssignmentsViewProps, 'pageState' | 'error' | 'onRetry'>) {
   if (pageState === 'loading') {
     return (
-      <section className="setter-state" aria-label="Loading setter assignments">
+      <section className="setter-state setter-state--assignments-loading" aria-label="Loading setter assignments">
         <div className="setter-skeleton" />
         <div className="setter-skeleton setter-skeleton--table" />
       </section>

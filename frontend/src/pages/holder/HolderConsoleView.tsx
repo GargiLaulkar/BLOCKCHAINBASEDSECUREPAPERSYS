@@ -24,7 +24,7 @@ function PageState({
 }) {
   if (state === 'loading') {
     return (
-      <section className="holder-state" aria-label="Loading holder console">
+      <section className="holder-state holder-state--console-loading" aria-label="Loading holder console">
         <div className="holder-skeleton" />
         <div className="holder-skeleton holder-skeleton--body" />
       </section>
@@ -105,7 +105,7 @@ export function HolderConsoleView({
                     : null;
 
   return (
-    <main className="holder-page holder-console" aria-labelledby="holder-console-title">
+    <section className="holder-page holder-console" aria-labelledby="holder-console-title">
       <header className="holder-console__header">
         <div className="holder-console__rosette">
           <Rosette hash={exam.rosetteHash} size={52} title="Exam custody checksum" />
@@ -315,6 +315,6 @@ export function HolderConsoleView({
       <footer className="holder-console__footer">
         <p>Private-key and plaintext-share buffers are cleared best-effort after use and on unmount. Browser runtimes cannot guarantee physical memory erasure.</p>
       </footer>
-    </main>
+    </section>
   );
 }

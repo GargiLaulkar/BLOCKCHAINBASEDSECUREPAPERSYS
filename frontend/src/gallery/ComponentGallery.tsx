@@ -555,7 +555,7 @@ export function ComponentGallery() {
           {/* Contrast Check Table */}
           <div style={{ marginTop: '24px' }}>
             <h3 style={{ fontSize: '17px', marginBottom: '8px' }}>WCAG AA contrast audit table</h3>
-            <div className="sigil-ledger-table-wrap">
+            <div className="sigil-ledger-table-wrap" tabIndex={0}>
               <table className="sigil-ledger-table">
                 <thead>
                   <tr>
@@ -1163,9 +1163,9 @@ export function ComponentGallery() {
           <div style={{ marginTop: '32px', border: '1px solid var(--sigil-color-hairline)', borderRadius: '3px', padding: '24px', background: 'var(--sigil-color-sheet)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', borderBottom: '1px solid var(--sigil-color-hairline)', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ fontSize: '16px', margin: '0 0 4px 0', color: 'var(--sigil-color-ink)' }}>
+                <h2 style={{ fontSize: '16px', margin: '0 0 4px 0', color: 'var(--sigil-color-ink)' }}>
                   2. Authority exam docket page states
-                </h3>
+                </h2>
                 <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)' }}>
                   Serial (No. 0007), title, inline custody bubbles, release window, and panel threshold.
                 </span>
@@ -1285,7 +1285,7 @@ export function ComponentGallery() {
           <div data-testid="key-ceremony-gallery" style={{ marginTop: '24px', padding: '24px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
               <div>
-                <h3 style={{ marginBottom: '4px' }}>Key Ceremony</h3>
+                <h2 style={{ fontSize: '22px', marginBottom: '4px' }}>Key Ceremony</h2>
                 <span style={{ fontSize: '12px', color: 'var(--sigil-color-slate)' }}>
                   Browser-only ceremony progress, encrypted share upload, and Open collection coupon.
                 </span>
@@ -1503,8 +1503,8 @@ export function ComponentGallery() {
           </div>
 
           <div data-testid="question-composer-gallery" style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
-            <h3>Question composer</h3>
-            <h4>Page state</h4>
+            <h2 style={{ fontSize: '22px' }}>Question composer</h2>
+            <h3>Page state</h3>
             <div data-testid="question-composer-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
               {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
                 <button
@@ -1595,8 +1595,8 @@ export function ComponentGallery() {
           </div>
 
           <div data-testid="holder-console-gallery" style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--sigil-color-hairline)', background: 'var(--sigil-color-sheet)' }}>
-            <h3>Holder exam console</h3>
-            <h4>Page state</h4>
+            <h2 style={{ fontSize: '22px' }}>Holder exam console</h2>
+            <h3>Page state</h3>
             <div data-testid="holder-console-state-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
               {(['ready', 'loading', 'empty', 'error', 'permission'] as const).map((state) => (
                 <button

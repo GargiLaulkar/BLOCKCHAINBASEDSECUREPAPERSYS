@@ -65,6 +65,7 @@ export const CustodyBubbles: React.FC<CustodyBubblesProps> = ({
       aria-valuenow={isCancelled ? 0 : currentIndex + 1}
       aria-valuemin={1}
       aria-valuemax={EXAM_LIFECYCLE_STAGES.length}
+      tabIndex={0}
     >
       {isCancelled ? (
         <div className="sigil-custody-step">

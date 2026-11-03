@@ -129,6 +129,35 @@ footer {
   border-top: 1px solid var(--sigil-color-hairline);
 }
 
+.participants-page-container--loading,
+.docket-page-container--loading {
+  display: flex;
+  flex-direction: column;
+}
+
+.participants-page-container--loading {
+  min-height: 544px;
+}
+
+.docket-page-container--loading {
+  min-height: 473px;
+}
+
+.participants-page-container--loading [data-testid="participants-loading-skeleton"],
+.docket-page-container--loading [data-testid="docket-loading-skeleton"] {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .participants-page-container--loading {
+    min-height: 949px;
+  }
+
+  .docket-page-container--loading {
+    min-height: 1145px;
+  }
+}
+
 
 /* --- Full-Screen Guard Screens --- */
 .sigil-guard-screen {

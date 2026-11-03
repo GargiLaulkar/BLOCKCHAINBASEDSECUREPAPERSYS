@@ -38,7 +38,7 @@ function pageStateContent(
 ) {
   if (state === 'loading') {
     return (
-      <section className="command-centre__state" aria-label="Loading exam command centre">
+      <section className="command-centre__state command-centre__state--loading" aria-label="Loading exam command centre">
         <div className="command-centre__skeleton command-centre__skeleton--header" />
         <div className="command-centre__skeleton command-centre__skeleton--body" />
       </section>
@@ -124,7 +124,7 @@ export function CommandCentreView(props: CommandCentreViewProps) {
         : undefined;
 
   return (
-    <main className="command-centre" aria-labelledby="command-centre-title">
+    <section className="command-centre">
       <header className="command-centre__header">
         <div
           className={`command-centre__rosette${sealBreaking ? ' is-breaking' : ''}`}
@@ -151,7 +151,7 @@ export function CommandCentreView(props: CommandCentreViewProps) {
               No holders or setters are assigned to this examination.
             </p>
           ) : (
-            <div className="command-centre__table-scroll">
+            <div className="command-centre__table-scroll" tabIndex={0} aria-label="Readiness table">
               <table className="command-centre__table">
                 <thead>
                   <tr>
@@ -263,6 +263,6 @@ export function CommandCentreView(props: CommandCentreViewProps) {
           </Coupon>
         </aside>
       </div>
-    </main>
+    </section>
   );
 }

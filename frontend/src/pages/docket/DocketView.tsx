@@ -192,7 +192,7 @@ export const DocketView: React.FC<DocketViewProps> = ({
   // 2. Loading Skeleton State
   if (isLoading) {
     return (
-      <div className="sigil-page-container" style={{ padding: '32px 0' }}>
+      <div className="sigil-page-container docket-page-container--loading" style={{ padding: '32px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--sigil-color-ink)' }}>

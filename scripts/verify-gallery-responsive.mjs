@@ -6,6 +6,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const baseUrl = process.env.SIGIL_GALLERY_URL ?? 'http://127.0.0.1:5173/dev/gallery';
 const screenshotDir = join(import.meta.dirname, '..', 'docs', 'screenshots');
+const axeSource = await readFile(
+  join(import.meta.dirname, '..', 'frontend', 'node_modules', 'axe-core', 'axe.min.js'),
+  'utf8',
+);
 const chromePath = process.env.CHROME_PATH ??
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const profileDir = await mkdtemp(join(tmpdir(), 'sigil-responsive-chrome-'));
@@ -35,6 +39,10 @@ let nextId = 0;
 const pending = new Map();
 const checks = [];
 const consoleErrors = [];
+const axeFindings = [];
+const stateHeights = {};
+const pageStateHeights = {};
+let axeStateCount = 0;
 let screenshotCount = 0;
 
 function assert(condition, message) {
@@ -126,6 +134,31 @@ async function click(expression) {
   await delay(100);
 }
 
+async function auditAxe(name, selector) {
+  const root = selector ? `document.querySelector(${JSON.stringify(selector)})` : 'document';
+  const violations = await evaluate(`axe.run(${root}).then(({ violations }) =>
+    violations.map((violation) => ({
+      id: violation.id,
+      impact: violation.impact,
+      help: violation.help,
+      nodes: violation.nodes.map((node) => ({
+        target: node.target,
+        summary: node.failureSummary,
+      })),
+    })),
+  )`);
+  axeStateCount += 1;
+  for (const violation of violations) {
+    const key = JSON.stringify({
+      id: violation.id,
+      nodes: violation.nodes.map((node) => [node.target, node.summary]),
+    });
+    if (!axeFindings.some((finding) => finding.key === key)) {
+      axeFindings.push({ key, screenshot: name, ...violation });
+    }
+  }
+}
+
 async function capture(name, selector) {
   const rect = await evaluate(`(() => {
     const element = document.querySelector(${JSON.stringify(selector)});
@@ -142,6 +175,59 @@ async function capture(name, selector) {
     };
   })()`);
   assert(rect.width > 0 && rect.height > 0, `Screenshot element is empty: ${selector}`);
+  const layoutState = name.match(/^(desktop|mobile)-(.+)-(loading|ready|populated)$/);
+  if (layoutState) {
+    const pageName = layoutState[2];
+    const layoutRoot = pageName.includes('participants')
+      ? '#fa-05-pages > div:nth-of-type(1)'
+      : pageName.includes('docket')
+        ? '#fa-05-pages > div:nth-of-type(2)'
+        : pageName.includes('create-exam')
+          ? '[data-testid="create-exam-gallery"]'
+          : pageName.includes('key-ceremony')
+            ? '[data-testid="key-ceremony-gallery"]'
+            : pageName.includes('command-centre')
+              ? '[data-testid="command-centre-gallery"]'
+              : pageName.includes('fa09-setter-assignments')
+                ? '[data-testid="setter-assignments-preview"]'
+                : pageName.includes('fa09-question-composer')
+                  ? '[data-testid="question-composer-preview"]'
+                  : pageName.includes('fa10-holder-assignments')
+                    ? '[data-testid="holder-assignments-preview"]'
+                    : pageName.includes('fa10-holder-console')
+                      ? '[data-testid="holder-console-preview"]'
+                      : null;
+    const measuredHeight = layoutRoot
+      ? await evaluate(`document.querySelector(${JSON.stringify(layoutRoot)})?.getBoundingClientRect().height ?? null`)
+      : rect.height;
+    const pageStateSelector = pageName.includes('participants')
+      ? '#fa-05-pages > div:nth-of-type(1) .sigil-page-container'
+      : pageName.includes('docket')
+        ? '#fa-05-pages > div:nth-of-type(2) .sigil-page-container'
+        : pageName.includes('create-exam')
+          ? '#fa-06-pages .create-exam__state, #fa-06-pages .create-exam'
+          : pageName.includes('key-ceremony')
+            ? '#fa-06-pages .key-ceremony__state, #fa-06-pages .key-ceremony'
+            : pageName.includes('command-centre')
+              ? '#fa-07-command-centre .command-centre__state, #fa-07-command-centre .command-centre'
+              : pageName.includes('fa09-setter-assignments')
+                ? '#fa-09-pages [data-testid="setter-assignments-preview"] .setter-state, #fa-09-pages [data-testid="setter-assignments-preview"] .setter-page'
+                : pageName.includes('fa09-question-composer')
+                  ? '#fa-09-pages [data-testid="question-composer-preview"] .setter-state, #fa-09-pages [data-testid="question-composer-preview"] .question-composer'
+                  : pageName.includes('fa10-holder-assignments')
+                    ? '#fa-10-pages [data-testid="holder-assignments-preview"] .holder-state, #fa-10-pages [data-testid="holder-assignments-preview"] .holder-page'
+                    : pageName.includes('fa10-holder-console')
+                      ? '#fa-10-pages [data-testid="holder-console-preview"] .holder-state, #fa-10-pages [data-testid="holder-console-preview"] .holder-console'
+                      : null;
+    const pageStateHeight = pageStateSelector
+      ? await evaluate(`document.querySelector(${JSON.stringify(pageStateSelector)})?.getBoundingClientRect().height ?? null`)
+      : null;
+    const key = `${layoutState[1]}-${pageName.replace(/-(loading|ready|populated)$/, '')}`;
+    stateHeights[key] ??= {};
+    stateHeights[key][layoutState[3] === 'populated' ? 'ready' : layoutState[3]] = measuredHeight;
+    pageStateHeights[key] ??= {};
+    pageStateHeights[key][layoutState[3] === 'populated' ? 'ready' : layoutState[3]] = pageStateHeight;
+  }
   await evaluate('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   const image = await command('Page.captureScreenshot', {
     format: 'png',
@@ -149,6 +235,7 @@ async function capture(name, selector) {
   });
   await writeFile(join(screenshotDir, `${name}.png`), Buffer.from(image.data, 'base64'));
   screenshotCount += 1;
+  await auditAxe(name);
   if (name.startsWith('mobile-') || name.startsWith('desktop-')) {
     const expectedWidth = name.startsWith('mobile-') ? 390 : 1280;
     const pageMetrics = await evaluate(`(() => ({
@@ -490,6 +577,240 @@ async function capturePageStateSet(prefix, pageName, controlsId, previewSelector
   }
 }
 
+async function dispatchKey(key, code, keyCode) {
+  await command('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key,
+    code,
+    windowsVirtualKeyCode: keyCode,
+  });
+  await command('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key,
+    code,
+    windowsVirtualKeyCode: keyCode,
+  });
+}
+
+async function auditKeyboardOrder(selector, label) {
+  const count = await evaluate(`(() => {
+    const root = document.querySelector(${JSON.stringify(selector)});
+    if (!root) return 0;
+    return [...root.querySelectorAll(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]):not([role="tablist"])',
+    )].filter((element) =>
+      !element.matches(':disabled') &&
+      element.tabIndex >= 0 &&
+      element.getClientRects().length > 0 &&
+      getComputedStyle(element).visibility !== 'hidden',
+    ).length;
+  })()`);
+  if (!count) return;
+
+  await evaluate(`(() => {
+    const root = document.querySelector(${JSON.stringify(selector)});
+    const first = [...root.querySelectorAll(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]):not([role="tablist"])',
+    )].find((element) =>
+      !element.matches(':disabled') &&
+      element.tabIndex >= 0 &&
+      element.getClientRects().length > 0 &&
+      getComputedStyle(element).visibility !== 'hidden',
+    );
+    first?.focus();
+  })()`);
+  for (let index = 0; index < count; index += 1) {
+    if (index > 0) {
+      const focus = await evaluate(`(() => {
+        const root = document.querySelector(${JSON.stringify(selector)});
+        const items = [...root.querySelectorAll(
+          'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]):not([role="tablist"])',
+        )].filter((element) =>
+          !element.matches(':disabled') &&
+          element.tabIndex >= 0 &&
+          element.getClientRects().length > 0 &&
+          getComputedStyle(element).visibility !== 'hidden',
+        );
+        const active = document.activeElement;
+        const expected = items[${index}];
+        const style = getComputedStyle(active);
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--sigil-color-marigold)';
+        document.body.append(probe);
+        const marigold = getComputedStyle(probe).color;
+        probe.remove();
+        return {
+          matches: active === expected,
+          visible: active.getClientRects().length > 0,
+          ring: style.outlineStyle !== 'none' &&
+            style.outlineWidth !== '0px' &&
+            style.outlineColor === marigold,
+          active: active.tagName + ' ' +
+            (active.getAttribute('aria-label') ?? active.textContent.trim().slice(0, 40)),
+          expected: expected
+            ? expected.tagName + ' ' +
+              (expected.getAttribute('aria-label') ?? expected.textContent.trim().slice(0, 40))
+            : null,
+        };
+      })()`);
+      assert(
+        focus.matches && focus.visible && focus.ring,
+        `Keyboard order or marigold focus ring failed for ${label} at control ${index}: ${JSON.stringify(focus)}`,
+      );
+    }
+    await dispatchKey('Tab', 'Tab', 9);
+  }
+}
+
+async function auditOverlayKeyboard() {
+  const dialogTrigger = await evaluate(`(() => {
+    const trigger = [...document.querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === 'Open modal dialog');
+    trigger?.focus();
+    trigger?.click();
+    return Boolean(trigger);
+  })()`);
+  assert(dialogTrigger, 'Gallery dialog trigger was not found.');
+  await delay(100);
+  const dialogOpened = await evaluate(
+    "Boolean(document.querySelector('[role=\"dialog\"]'))",
+  );
+  assert(dialogOpened, 'Gallery dialog did not open.');
+  await auditAxe(`dialog-open-${await evaluate('innerWidth')}`);
+  await dispatchKey('Escape', 'Escape', 27);
+  await delay(100);
+  const dialogClosedAndRestored = await evaluate(`(() => {
+    const trigger = [...document.querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === 'Open modal dialog');
+    return !document.querySelector('[role="dialog"]') &&
+      document.activeElement === trigger;
+  })()`);
+  assert(dialogClosedAndRestored, 'Escape did not close the dialog and restore focus.');
+
+  const popoverTrigger = await evaluate(`(() => {
+    const trigger = [...document.querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === 'Open popover');
+    trigger?.focus();
+    trigger?.click();
+    return Boolean(trigger);
+  })()`);
+  assert(popoverTrigger, 'Gallery popover trigger was not found.');
+  await delay(100);
+  const popoverOpened = await evaluate(
+    "Boolean(document.querySelector('[data-radix-popper-content-wrapper]'))",
+  );
+  assert(popoverOpened, 'Gallery popover did not open.');
+  await auditAxe(`popover-open-${await evaluate('innerWidth')}`);
+  await dispatchKey('Escape', 'Escape', 27);
+  await delay(100);
+  const popoverClosedAndRestored = await evaluate(`(() => {
+    const trigger = [...document.querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === 'Open popover');
+    return !document.querySelector('[data-radix-popper-content-wrapper]') &&
+      document.activeElement === trigger;
+  })()`);
+  assert(popoverClosedAndRestored, 'Escape did not close the popover and restore focus.');
+}
+
+async function auditReducedMotion() {
+  await command('Emulation.setEmulatedMedia', {
+    features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
+  });
+  await clickControl('command-centre-page-state-controls', 'ready');
+  await clickControl('command-centre-chain-state-controls', 'Released');
+  const motion = await evaluate(`(() => {
+    const elements = [...document.querySelectorAll('body *')];
+    const rosette = document.querySelector('#fa-07-command-centre .command-centre__rosette svg');
+    const activeAnimations = document.getAnimations().filter((animation) =>
+      animation.playState === 'running',
+    );
+    return {
+      reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      rosetteAnimation: rosette ? getComputedStyle(rosette).animationName : null,
+      transitions: elements
+        .map((element) => getComputedStyle(element).transitionDuration)
+        .flatMap((value) => value.split(','))
+        .filter((value) => parseFloat(value) > 0),
+      animations: elements
+        .map((element) => getComputedStyle(element).animationDuration)
+        .flatMap((value) => value.split(','))
+        .filter((value) => parseFloat(value) > 0),
+      activeAnimations: activeAnimations.length,
+    };
+  })()`);
+  assert(
+    motion.reducedMotion &&
+      motion.rosetteAnimation === 'none' &&
+      motion.transitions.length === 0 &&
+      motion.animations.length === 0 &&
+      motion.activeAnimations === 0,
+    `Reduced motion did not disable all motion: ${JSON.stringify(motion)}`,
+  );
+  await command('Emulation.setEmulatedMedia', { features: [] });
+  return motion;
+}
+
+async function auditSelectAndTabsKeyboard() {
+  const opened = await evaluate(`(() => {
+    const trigger = document.querySelector('#fa-02-primitives [role="combobox"]');
+    trigger?.focus();
+    return Boolean(trigger);
+  })()`);
+  assert(opened, 'Gallery select trigger was not found.');
+  await dispatchKey('Enter', 'Enter', 13);
+  await delay(100);
+  await auditAxe(`select-open-${await evaluate('innerWidth')}`, '[role="listbox"]');
+  assert(
+    await evaluate("Boolean(document.querySelector('[role=\"listbox\"]'))"),
+    'Keyboard activation did not open the gallery select.',
+  );
+  const selectedBeforeArrow = await evaluate(
+    "document.querySelector('#fa-02-primitives [role=\"combobox\"]')?.innerText",
+  );
+  await dispatchKey('ArrowDown', 'ArrowDown', 40);
+  await dispatchKey('Enter', 'Enter', 13);
+  await delay(100);
+  const selectedAfterArrow = await evaluate(
+    "document.querySelector('#fa-02-primitives [role=\"combobox\"]')?.innerText",
+  );
+  assert(
+    selectedAfterArrow &&
+      selectedAfterArrow !== selectedBeforeArrow &&
+      /Section [2-4]: (Chemistry|Botany|Zoology)/.test(selectedAfterArrow),
+    `ArrowDown and Enter did not select a different option: before=${selectedBeforeArrow}, after=${selectedAfterArrow}`,
+  );
+  assert(
+    await evaluate("document.activeElement?.matches('#fa-02-primitives [role=\"combobox\"]')"),
+    'Select focus did not return to its trigger after choosing an option.',
+  );
+  await dispatchKey('Enter', 'Enter', 13);
+  await delay(100);
+  assert(
+    await evaluate("Boolean(document.querySelector('[role=\"listbox\"]'))"),
+    'Keyboard activation did not reopen the gallery select.',
+  );
+  await dispatchKey('Escape', 'Escape', 27);
+  await delay(100);
+  assert(
+    !(await evaluate("Boolean(document.querySelector('[role=\"listbox\"]'))")) &&
+      await evaluate("document.activeElement?.matches('#fa-02-primitives [role=\"combobox\"]')"),
+    'Escape did not close the select and restore focus to its trigger.',
+  );
+
+  const tabsFound = await evaluate(`(() => {
+    const tabs = [...document.querySelectorAll('#fa-02-primitives [role="tab"]')];
+    tabs[0]?.focus();
+    return tabs.length > 1;
+  })()`);
+  assert(tabsFound, 'Gallery tab list was not found.');
+  await dispatchKey('ArrowRight', 'ArrowRight', 39);
+  await delay(100);
+  assert(
+    await evaluate(`document.querySelectorAll('#fa-02-primitives [role="tab"]')[1]?.getAttribute('aria-selected') === 'true'`),
+    'ArrowRight did not move selection in the gallery tab list.',
+  );
+}
+
 try {
   await mkdir(screenshotDir, { recursive: true });
   const { port, version } = await waitForEndpoint();
@@ -502,17 +823,31 @@ try {
   await command('Log.enable');
   await command('Page.navigate', { url: baseUrl });
   await waitForGallery();
+  await evaluate(axeSource);
 
   for (const width of [1280, 390]) {
     const prefix = width === 1280 ? 'desktop-' : 'mobile-';
     const metrics = await viewportMetrics(width);
     await captureGalleryStates(prefix);
+    await auditOverlayKeyboard();
+    await auditKeyboardOrder('.sigil-topbar', 'top bar');
+    await auditKeyboardOrder('#fa-05-pages > div:nth-of-type(1)', 'participants');
+    await auditKeyboardOrder('#fa-05-pages > div:nth-of-type(2)', 'docket');
+    await auditKeyboardOrder('[data-testid="create-exam-gallery"]', 'create exam gallery');
+    await auditKeyboardOrder('[data-testid="key-ceremony-gallery"]', 'key ceremony gallery');
+    await auditKeyboardOrder('#fa-07-command-centre .command-centre', 'command centre');
     await clickControl('question-composer-flow-controls', 'idle');
     await clickControl('holder-console-flow-controls', 'setup');
     await capturePageStateSet(prefix, 'fa09-setter-assignments', 'setter-assignments-state-controls', 'setter-assignments-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
     await capturePageStateSet(prefix, 'fa09-question-composer', 'question-composer-state-controls', 'question-composer-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
     await capturePageStateSet(prefix, 'fa10-holder-assignments', 'holder-assignments-state-controls', 'holder-assignments-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
     await capturePageStateSet(prefix, 'fa10-holder-console', 'holder-console-state-controls', 'holder-console-preview', ['ready', 'loading', 'empty', 'error', 'permission']);
+    await auditKeyboardOrder('[data-testid="setter-assignments-preview"]', 'setter assignments');
+    await auditKeyboardOrder('[data-testid="question-composer-preview"]', 'question composer');
+    await auditKeyboardOrder('[data-testid="holder-assignments-preview"]', 'holder assignments');
+    await auditKeyboardOrder('[data-testid="holder-console-preview"]', 'holder console');
+    await auditKeyboardOrder('#fa-02-primitives', 'gallery primitives');
+    await auditSelectAndTabsKeyboard();
     await clickControl('question-composer-state-controls', 'ready');
     for (const state of ['idle', 'encrypt', 'upload', 'sign', 'confirm', 'complete', 'error']) {
       await clickControl('question-composer-flow-controls', state);
@@ -523,7 +858,8 @@ try {
       await clickControl('holder-console-flow-controls', state);
       await capture(`${prefix}fa10-holder-console-flow-${state}`, '[data-testid="holder-console-preview"]');
     }
-    console.log(JSON.stringify({ width, metrics, screenshots: screenshotCount }));
+    const reducedMotion = await auditReducedMotion();
+    console.log(JSON.stringify({ width, metrics, reducedMotion, screenshots: screenshotCount }));
   }
 
   const storageState = await evaluate(`(() => ({
@@ -533,11 +869,30 @@ try {
   assert(storageState.localStorage.length === 0, `localStorage is not empty: ${JSON.stringify(storageState.localStorage)}`);
   assert(storageState.sessionStorage.length === 0, `sessionStorage is not empty: ${JSON.stringify(storageState.sessionStorage)}`);
   assert(consoleErrors.length === 0, `Browser console errors: ${JSON.stringify(consoleErrors)}`);
+  assert(
+    axeFindings.length === 0,
+    `axe-core reported violations: ${JSON.stringify(axeFindings, null, 2)}`,
+  );
+  const unbalancedLayouts = Object.entries(stateHeights)
+    .filter(([, heights]) =>
+      Number.isFinite(heights.loading) &&
+      Number.isFinite(heights.ready) &&
+      Math.abs(heights.loading - heights.ready) / Math.max(heights.loading, heights.ready) > 0.02,
+    )
+    .map(([page, heights]) => ({ page, ...heights }));
+  assert(
+    unbalancedLayouts.length === 0,
+    `Loading and ready layouts differ by over 2%: ${JSON.stringify(unbalancedLayouts)}`,
+  );
   console.log(JSON.stringify({
     browser: version.Browser,
     screenshotCount,
     storageState,
     consoleErrors,
+    axeFindingCount: axeFindings.length,
+    stateHeights,
+    pageStateHeights,
+    axeStateCount,
     checks,
   }, null, 2));
 } finally {

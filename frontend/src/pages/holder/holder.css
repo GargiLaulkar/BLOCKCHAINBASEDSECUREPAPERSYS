@@ -13,6 +13,20 @@
   border: 1px solid var(--sigil-color-hairline);
 }
 
+.holder-state--assignments-loading,
+.holder-state--console-loading {
+  display: flex;
+  flex-direction: column;
+}
+
+.holder-state--assignments-loading {
+  min-height: 338px;
+}
+
+.holder-state--console-loading {
+  min-height: 1387px;
+}
+
 .holder-state h1,
 .holder-page__header h1,
 .holder-console h1,
@@ -86,6 +100,11 @@
 .holder-skeleton--body {
   width: 100% !important;
   height: 190px !important;
+}
+
+.holder-state--assignments-loading .holder-skeleton--table,
+.holder-state--console-loading .holder-skeleton--body {
+  flex: 1;
 }
 
 .holder-console__header {
@@ -378,6 +397,14 @@
 }
 
 @media (max-width: 760px) {
+  .holder-state--assignments-loading {
+    min-height: 434px;
+  }
+
+  .holder-state--console-loading {
+    min-height: 2125px;
+  }
+
   .holder-page,
   .holder-state {
     padding: 24px 16px 36px;

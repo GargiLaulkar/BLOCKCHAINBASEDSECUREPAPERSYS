@@ -20,7 +20,11 @@ export const Popover: React.FC<PopoverProps> = ({
     <RadixPopover.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       <RadixPopover.Trigger asChild>{trigger}</RadixPopover.Trigger>
       <RadixPopover.Portal>
-        <RadixPopover.Content className="sigil-popover-content" sideOffset={5}>
+        <RadixPopover.Content
+          className="sigil-popover-content"
+          sideOffset={5}
+          aria-label="More information"
+        >
           {children}
         </RadixPopover.Content>
       </RadixPopover.Portal>

@@ -479,6 +479,12 @@
 }
 
 /* --- HashChip --- */
+.sigil-hash-chip-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .sigil-hash-chip {
   display: inline-flex;
   align-items: center;
@@ -493,6 +499,13 @@
   cursor: pointer;
   user-select: none;
   transition: background-color 0.15s ease;
+  appearance: none;
+  text-align: left;
+}
+
+.sigil-hash-chip__link {
+  color: var(--sigil-color-ink);
+  text-decoration: none;
 }
 
 .sigil-hash-chip:hover {

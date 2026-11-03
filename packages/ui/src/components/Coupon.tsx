@@ -25,7 +25,7 @@ export const Coupon: React.FC<CouponProps> = ({
   children,
 }) => {
   return (
-    <div className={`sigil-coupon ${className}`.trim()} role="region" aria-label={title}>
+    <div className={`sigil-coupon ${className}`.trim()}>
       <div className="sigil-coupon__header">
         <h3 className="sigil-coupon__title">{title}</h3>
       </div>

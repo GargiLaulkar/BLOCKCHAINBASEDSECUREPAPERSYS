@@ -24,7 +24,7 @@ function PageState({
 }) {
   if (state === 'loading') {
     return (
-      <section className="setter-state" aria-label="Loading question composer">
+      <section className="setter-state setter-state--composer-loading" aria-label="Loading question composer">
         <div className="setter-skeleton" />
         <div className="setter-skeleton setter-skeleton--table" />
       </section>
@@ -273,7 +273,12 @@ export function QuestionComposerView(props: QuestionComposerViewProps) {
             />
           </label>
           {displayedImportErrors.length > 0 && (
-            <div className="question-composer__import-errors" role="alert">
+            <div
+              className="question-composer__import-errors"
+              role="alert"
+              aria-label="Import row errors"
+              tabIndex={0}
+            >
               <table className="setter-table">
                 <thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
                 <tbody>

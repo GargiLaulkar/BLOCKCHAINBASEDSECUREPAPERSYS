@@ -161,6 +161,12 @@
   border: 1px solid var(--sigil-color-hairline);
 }
 
+.create-exam__state--loading {
+  display: flex;
+  flex-direction: column;
+  min-height: 524px;
+}
+
 .create-exam__skeleton {
   background: var(--sigil-color-hairline);
   animation: create-exam-pulse 1.4s ease-in-out infinite;
@@ -174,6 +180,7 @@
 }
 
 .create-exam__skeleton--form {
+  flex: 1;
   height: 220px;
 }
 
@@ -182,9 +189,17 @@
 }
 
 @media (max-width: 760px) {
+  .create-exam__state--loading {
+    min-height: 1308px;
+  }
+
   .create-exam__layout {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  .create-exam__review {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .create-exam__steps {

@@ -80,6 +80,20 @@
   border: 1px solid var(--sigil-color-hairline);
 }
 
+.setter-state--assignments-loading,
+.setter-state--composer-loading {
+  display: flex;
+  flex-direction: column;
+}
+
+.setter-state--assignments-loading {
+  min-height: 305px;
+}
+
+.setter-state--composer-loading {
+  min-height: 1574px;
+}
+
 .setter-skeleton {
   height: 32px;
   width: min(280px, 100%);
@@ -91,6 +105,7 @@
 .setter-skeleton--table {
   width: 100%;
   height: 180px;
+  flex: 1;
 }
 
 .setter-error,
@@ -331,6 +346,14 @@
 }
 
 @media (max-width: 760px) {
+  .setter-state--assignments-loading {
+    min-height: 413px;
+  }
+
+  .setter-state--composer-loading {
+    min-height: 2588px;
+  }
+
   .setter-page,
   .setter-state {
     padding: 20px 16px;

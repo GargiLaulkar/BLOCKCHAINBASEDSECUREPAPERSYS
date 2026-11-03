@@ -263,6 +263,16 @@
   border-color: var(--sigil-color-alert);
 }
 
+.command-centre__state--loading {
+  width: min(1200px, 100%);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  min-height: 1026px;
+}
+
 .command-centre__state h1 {
   margin: 0 0 8px;
   font-size: 18px;
@@ -284,6 +294,7 @@
 }
 
 .command-centre__skeleton--body {
+  flex: 1;
   height: 280px;
 }
 
@@ -295,6 +306,11 @@
 }
 
 @media (max-width: 900px) {
+  .command-centre__state--loading {
+    min-height: 1789px;
+    padding: 22px 14px 36px;
+  }
+
   .command-centre__grid {
     grid-template-columns: minmax(0, 1fr);
   }

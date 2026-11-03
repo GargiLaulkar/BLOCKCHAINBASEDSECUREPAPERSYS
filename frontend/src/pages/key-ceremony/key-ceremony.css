@@ -129,7 +129,21 @@
   background: var(--sigil-color-hairline);
 }
 
+.key-ceremony__state--loading {
+  display: flex;
+  flex-direction: column;
+  min-height: 675px;
+}
+
+.key-ceremony__state--loading .key-ceremony__skeleton {
+  flex: 1;
+}
+
 @media (max-width: 760px) {
+  .key-ceremony__state--loading {
+    min-height: 1468px;
+  }
+
   .key-ceremony__layout {
     grid-template-columns: 1fr;
   }

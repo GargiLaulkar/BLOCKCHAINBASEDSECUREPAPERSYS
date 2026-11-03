@@ -45,7 +45,7 @@ export function KeyCeremonyView({
 }: KeyCeremonyViewProps) {
   if (pageState === 'loading') {
     return (
-      <section className="key-ceremony__state" aria-label="Loading key ceremony">
+      <section className="key-ceremony__state key-ceremony__state--loading" aria-label="Loading key ceremony">
         <div className="key-ceremony__skeleton" />
       </section>
     );

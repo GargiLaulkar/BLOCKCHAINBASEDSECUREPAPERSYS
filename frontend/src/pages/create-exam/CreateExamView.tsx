@@ -113,7 +113,7 @@ export function CreateExamView({
 
   if (pageState === 'loading') {
     return (
-      <section className="create-exam__state" aria-label="Loading exam setup">
+      <section className="create-exam__state create-exam__state--loading" aria-label="Loading exam setup">
         <div className="create-exam__skeleton create-exam__skeleton--heading" />
         <div className="create-exam__skeleton create-exam__skeleton--form" />
       </section>

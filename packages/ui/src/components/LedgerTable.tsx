@@ -57,7 +57,7 @@ export function LedgerTable<T>({
   };
 
   return (
-    <div className={`sigil-ledger-table-wrap ${className}`.trim()}>
+    <div className={`sigil-ledger-table-wrap ${className}`.trim()} tabIndex={0}>
       <table className="sigil-ledger-table">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>

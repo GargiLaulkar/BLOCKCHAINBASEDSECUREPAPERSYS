@@ -14,7 +14,7 @@ function PageState({
 }) {
   if (state === 'loading') {
     return (
-      <section className="holder-state" aria-label="Loading holder assignments">
+      <section className="holder-state holder-state--assignments-loading" aria-label="Loading holder assignments">
         <div className="holder-skeleton" />
         <div className="holder-skeleton holder-skeleton--table" />
       </section>
@@ -60,7 +60,7 @@ export function HolderAssignmentsView({
   }
 
   return (
-    <main className="holder-page" aria-labelledby="holder-assignments-title">
+    <section className="holder-page" aria-labelledby="holder-assignments-title">
       <header className="holder-page__header">
         <p className="sigil-mono">KEY HOLDER / ASSIGNMENTS</p>
         <h1 id="holder-assignments-title">Assigned examinations</h1>
@@ -96,6 +96,6 @@ export function HolderAssignmentsView({
           </tbody>
         </table>
       </div>
-    </main>
+    </section>
   );
 }

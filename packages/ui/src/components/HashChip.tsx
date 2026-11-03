@@ -36,42 +36,32 @@ export const HashChip: React.FC<HashChipProps> = ({
     }
   };
 
-  const chipContent = (
-    <span
-      className={`sigil-hash-chip ${className}`.trim()}
-      onClick={handleCopy}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          void handleCopy(e as unknown as React.MouseEvent);
-        }
-      }}
-      aria-label={`Hash ${hash}. Click to copy.`}
-    >
-      <span>{truncated}</span>
-      <span className="sigil-hash-chip__copy-icon" aria-hidden="true">
-        {copied ? '✓' : '⧉'}
-      </span>
+  return (
+    <span className="sigil-hash-chip-group">
+      <Tooltip content={copied ? 'Copied full hash' : hash}>
+        <button
+          type="button"
+          className={`sigil-hash-chip ${className}`.trim()}
+          onClick={handleCopy}
+          aria-label={`Copy hash ${truncated}`}
+        >
+          <span>{truncated}</span>
+          <span className="sigil-hash-chip__copy-icon" aria-hidden="true">
+            {copied ? '✓' : '⧉'}
+          </span>
+        </button>
+      </Tooltip>
       {txUrl && (
         <a
+          className="sigil-hash-chip__link"
           href={txUrl}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          aria-label="View transaction details"
-          style={{ textDecoration: 'none', marginLeft: '2px' }}
+          aria-label="↗ View transaction details"
         >
           ↗
         </a>
       )}
     </span>
-  );
-
-  return (
-    <Tooltip content={copied ? 'Copied full hash!' : hash}>
-      {chipContent}
-    </Tooltip>
   );
 };

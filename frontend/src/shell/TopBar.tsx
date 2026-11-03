@@ -64,7 +64,7 @@ export const TopBar: React.FC = () => {
   return (
     <header className="sigil-topbar" role="banner">
       <div className="sigil-topbar__left">
-        <Link to="/" className="brand" aria-label="SIGIL home">
+        <Link to="/" className="brand">
           <span className="brand-mark" aria-hidden="true">S</span>
           <span>SIGIL</span>
         </Link>
