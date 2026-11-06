@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { ethers } from 'ethers';
 
 
 export type SystemRole = 'ADMIN' | 'AUTHORITY' | 'SETTER' | 'HOLDER' | 'CENTRE' | 'AUDITOR';
@@ -115,7 +116,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts && accounts.length > 0) {
-        setAccount(accounts[0] ?? null);
+        try {
+          setAccount(ethers.getAddress(accounts[0]));
+        } catch {
+          setError('Invalid wallet address.');
+          return;
+        }
         void checkCurrentSession();
       } else {
         setAccount(null);
@@ -131,7 +137,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     eth.request({ method: 'eth_accounts' })
       .then((accs: string[]) => {
         if (accs && accs.length > 0) {
-          setAccount(accs[0] ?? null);
+          try {
+            setAccount(ethers.getAddress(accs[0]));
+          } catch {
+            setError('Invalid wallet address.');
+          }
         }
       })
       .catch(() => {});
@@ -162,7 +172,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const accounts = await eth.request({ method: 'eth_requestAccounts' });
       if (accounts && accounts.length > 0) {
-        setAccount(accounts[0]);
+        try {
+          setAccount(ethers.getAddress(accounts[0]));
+        } catch {
+          setError('Invalid wallet address.');
+          return;
+        }
       }
       const cId = await eth.request({ method: 'eth_chainId' });
       setChainId(cId);
@@ -242,6 +257,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!verifyRes.ok) {
+        if (verifyRes.status === 429 || verifyRes.status >= 500) {
+          throw new Error('Server unreachable.');
+        }
         let code = '';
         try {
           const errorData = await verifyRes.json();
@@ -252,7 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (code === 'INVALID_NONCE') {
             throw new Error('Session expired.');
           }
-          throw new Error(errorData?.error?.message || 'SIWE verification failed.');
+          throw new Error('Server rejected the signature.');
         } catch (e: any) {
           if (e instanceof Error && e.message) throw e;
           throw new Error('Server rejected the signature.');
