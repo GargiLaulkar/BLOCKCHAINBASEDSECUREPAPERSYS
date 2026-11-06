@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { decodeContractError } from '../utils/errors';
+
 
 export type SystemRole = 'ADMIN' | 'AUTHORITY' | 'SETTER' | 'HOLDER' | 'CENTRE' | 'AUDITOR';
 
@@ -197,10 +197,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       // 1. Fetch nonce
-      const nonceRes = await fetch(`${apiOrigin}/api/auth/nonce`, {
-        credentials: 'include',
-      });
-      if (!nonceRes.ok) throw new Error('Failed to retrieve authentication nonce.');
+      let nonceRes: Response;
+      try {
+        nonceRes = await fetch(`${apiOrigin}/api/auth/nonce`, {
+          credentials: 'include',
+        });
+      } catch {
+        throw new Error('Server unreachable.');
+      }
+      if (!nonceRes.ok) throw new Error('Server unreachable.');
       const { nonce } = await nonceRes.json();
 
       // 2. Prepare SIWE message
@@ -212,30 +217,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const message = `${domain} wants you to sign in with your Ethereum account:\n${account}\n\nSign in with Ethereum to the app.\n\nURI: ${origin}\nVersion: 1\nChain ID: ${numericChainId}\nNonce: ${nonce}\nIssued At: ${issuedAt}`;
 
       // 3. Request personal_sign from wallet
-      const signature = await eth.request({
-        method: 'personal_sign',
-        params: [message, account],
-      });
+      let signature: string;
+      try {
+        signature = await eth.request({
+          method: 'personal_sign',
+          params: [message, account],
+        });
+      } catch (err: any) {
+        if (err?.code === 4001) throw new Error('Wallet request rejected.');
+        throw err;
+      }
 
       // 4. Verify with backend
-      const verifyRes = await fetch(`${apiOrigin}/api/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ message, signature }),
-      });
+      let verifyRes: Response;
+      try {
+        verifyRes = await fetch(`${apiOrigin}/api/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ message, signature }),
+        });
+      } catch {
+        throw new Error('Server unreachable.');
+      }
 
       if (!verifyRes.ok) {
-        const errorData = await verifyRes.json();
-        throw new Error(errorData?.error?.message || 'SIWE verification failed.');
+        let code = '';
+        try {
+          const errorData = await verifyRes.json();
+          code = errorData?.error?.code || '';
+          if (verifyRes.status === 401 || code === 'INVALID_SIGNATURE') {
+            throw new Error('Server rejected the signature.');
+          }
+          if (code === 'INVALID_NONCE') {
+            throw new Error('Session expired.');
+          }
+          throw new Error(errorData?.error?.message || 'SIWE verification failed.');
+        } catch (e: any) {
+          if (e instanceof Error && e.message) throw e;
+          throw new Error('Server rejected the signature.');
+        }
       }
 
       const verifyData = await verifyRes.json();
       setIsAuthenticated(true);
       setRoles(verifyData.roles || []);
     } catch (err: any) {
-      const decoded = decodeContractError(err);
-      setError(decoded.formatted);
+      const msg = err?.message || '';
+      if (msg === 'Wallet request rejected.' || msg === 'Server unreachable.' || msg === 'Server rejected the signature.' || msg === 'Session expired.') {
+        setError(msg);
+      } else if (/fetch|network|failed to fetch/i.test(msg)) {
+        setError('Server unreachable.');
+      } else {
+        setError(msg || 'Sign-in failed.');
+      }
     } finally {
       setIsLoggingIn(false);
     }
