@@ -1,10 +1,10 @@
 // Import the ABI JSON using a relative path so both TypeScript (moduleResolution:
 // Bundler) and Vite/Rollup resolve it without going through the CJS-only dist of
 // @sigil/contracts-types, whose exports map blocks sub-path imports at bundle time.
-import ExamVaultArtifact from '../../../packages/contracts-types/dist/ExamVault.json';
+import ExamVaultArtifact from '../../../packages/contracts-types/abi/ExamVault.json';
 import { Interface, type InterfaceAbi } from 'ethers';
 
-const ExamVaultABI = ExamVaultArtifact.abi as InterfaceAbi;
+const ExamVaultABI = ExamVaultArtifact as InterfaceAbi;
 
 export interface DecodedContractError {
   name: string;

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { keccakJson } from '@sigil/core/canonical';
-import type { ExamConfig } from '@sigil/contracts-types';
+import type { ExamConfig } from '../../../../packages/contracts-types/src/index';
 import { ethers, type InterfaceAbi } from 'ethers';
-import ExamVaultArtifact from '../../../../packages/contracts-types/dist/ExamVault.json';
+import ExamVaultArtifact from '../../../../packages/contracts-types/abi/ExamVault.json';
 import { useAuthGuard } from '../../auth/useAuthGuard';
 import { useParticipants } from '../../hooks/useParticipants';
 import type { ParticipantRecord } from '../../hooks/useParticipants';
@@ -18,7 +18,7 @@ type MetadataRequest =
   paths['/api/exams/{id}/meta']['post']['requestBody']['content']['application/json'];
 
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? 'http://localhost:4000';
-const contractInterface = new ethers.Interface(ExamVaultArtifact.abi as InterfaceAbi);
+const contractInterface = new ethers.Interface(ExamVaultArtifact as InterfaceAbi);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

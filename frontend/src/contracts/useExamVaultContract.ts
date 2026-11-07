@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
-import ExamVaultArtifact from '../../../packages/contracts-types/dist/ExamVault.json';
+import ExamVaultArtifact from '../../../packages/contracts-types/abi/ExamVault.json';
 import { useAuth } from '../auth/AuthContext';
 
 const DEFAULT_CONTRACT_ADDRESS =
@@ -43,7 +43,7 @@ export function useExamVaultContract(): ExamVaultContractState {
         const signer = await provider.getSigner();
         const nextContract = new ethers.Contract(
           DEFAULT_CONTRACT_ADDRESS,
-          (ExamVaultArtifact as any).abi,
+          ExamVaultArtifact as any,
           signer,
         );
         if (!isMounted) return;

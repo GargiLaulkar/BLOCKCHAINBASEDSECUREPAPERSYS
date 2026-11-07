@@ -1,4 +1,4 @@
-import type { ExamConfig } from '@sigil/contracts-types';
+import type { ExamConfig } from '../../../../packages/contracts-types/src/index';
 import type { paths } from '../../api/generated';
 
 export type ExamMetadata =
