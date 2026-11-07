@@ -30,3 +30,10 @@ Before release, run the real-stack walkthrough yourself with a configured `backe
 ## Accessibility library note
 
 When Radix Select is open, its current modal implementation applies `aria-hidden` to the rest of the gallery while leaving background controls focusable in the DOM. A full-document axe scan in that transient state reports `aria-hidden-focus` on the hidden siblings. The select overlay itself passes axe, and the full-document scans for the captured page screenshots pass. The current Radix Select Root API exposes no `modal` option, so this library-owned behavior is recorded for an upstream UI-library review rather than worked around with global DOM mutation.
+
+## Open items for other members
+- Member 5: useParticipants must read positional array payload [address, role, profileHash] (accept object too); request <=100 events per call.
+- Member 3: start indexer in backend/src/server.ts; document payloadJson shape in OpenAPI.
+- runCeremony: zero buffers; ceremony screen must not claim key wiped.
+- Contract differs from spec for openCollection, commitRandomness; sealExam needs exact quota.
+- Optional hooks: useExamCommandCentre, useExamSectionTotals, useHolderExamStatus.
