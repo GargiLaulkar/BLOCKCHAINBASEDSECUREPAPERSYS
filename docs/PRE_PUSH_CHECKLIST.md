@@ -65,3 +65,9 @@ gh pr create --base main --head member4/design-system --title "SIGIL Member 4 fi
 ```
 
 Do not run either command until approval is explicit.
+
+WARNING: revert uncommitted patch in frontend/src/hooks/useParticipants.ts before commit/push: git checkout -- frontend/src/hooks/useParticipants.ts
+
+WARNING: temporary indexer runner (OS temp) is a workaround; do not commit. Stop it with Stop-Process -Id <pid> or taskkill.
+
+WARNING: revert uncommitted hook patch: git checkout -- frontend/src/hooks/useParticipants.ts
