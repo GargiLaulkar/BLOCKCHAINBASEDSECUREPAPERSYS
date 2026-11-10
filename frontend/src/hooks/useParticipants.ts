@@ -51,7 +51,13 @@ export interface UseParticipantMutationResult<TInput> {
 }
 
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:4000";
+const EVENT_PAGE_LIMIT = 100;
 const participantsRefreshListeners = new Set<() => void>();
+
+interface EventPageResponse {
+  events?: Array<{ payloadJson?: Record<string, unknown> }>;
+  nextCursor?: string | null;
+}
 
 export function notifyParticipantsChanged(): void {
   for (const listener of participantsRefreshListeners) {
@@ -159,6 +165,50 @@ async function requestJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function fetchEventsPage(
+  type: "ParticipantRegistered" | "ParticipantRevoked",
+  cursor?: string,
+): Promise<EventPageResponse> {
+  const searchParams = new URLSearchParams({
+    type,
+    limit: String(EVENT_PAGE_LIMIT),
+  });
+
+  if (cursor) {
+    searchParams.set("cursor", cursor);
+  }
+
+  return requestJson<EventPageResponse>(`/api/events?${searchParams.toString()}`);
+}
+
+async function fetchAllEventsByType(
+  type: "ParticipantRegistered" | "ParticipantRevoked",
+): Promise<Array<{ payloadJson?: Record<string, unknown> }>> {
+  const allEvents: Array<{ payloadJson?: Record<string, unknown> }> = [];
+  const seenCursors = new Set<string>();
+  let cursor: string | undefined;
+
+  while (true) {
+    const response = await fetchEventsPage(type, cursor);
+    const events = response.events ?? [];
+    allEvents.push(...events);
+
+    const nextCursor = response.nextCursor ?? null;
+    if (!nextCursor) {
+      break;
+    }
+
+    if (seenCursors.has(nextCursor)) {
+      throw new Error(`Event pagination for ${type} repeated cursor: ${nextCursor}. Aborting to prevent an infinite loop.`);
+    }
+
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+
+  return allEvents;
+}
+
 async function awaitTransactionConfirmation(
   tx: TransactionResponseLike | null | undefined,
   label: string,
@@ -253,17 +303,17 @@ export function mergeParticipantEvents(
 }
 
 async function fetchParticipantsFromEvents(): Promise<ParticipantRecord[]> {
-  const [registeredResponse, revokedResponse] = await Promise.all([
-    requestJson<{ events?: Array<{ payloadJson?: Record<string, unknown> }> }>('/api/events?type=ParticipantRegistered&limit=250'),
-    requestJson<{ events?: Array<{ payloadJson?: Record<string, unknown> }> }>('/api/events?type=ParticipantRevoked&limit=250'),
+  const [registeredEvents, revokedEvents] = await Promise.all([
+    fetchAllEventsByType("ParticipantRegistered"),
+    fetchAllEventsByType("ParticipantRevoked"),
   ]);
 
-  return mergeParticipantEvents(registeredResponse.events ?? [], revokedResponse.events ?? []);
+  return mergeParticipantEvents(registeredEvents, revokedEvents);
 }
 
 export function useParticipants(options: { enabled?: boolean; limit?: number } = {}): UseParticipantsResult {
   const enabled = options.enabled ?? true;
-  const limit = options.limit ?? 250;
+  const limit = options.limit ?? 100;
 
   const [participants, setParticipants] = useState<ParticipantRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(enabled);
