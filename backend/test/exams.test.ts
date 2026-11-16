@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { canonical } from "@sigil/core";
 import { createApp } from "../src/app.js";
 import { parseConfig } from "../src/config.js";
+import { clearRoleCache } from "../src/services/roles.js";
 import type { Contract } from "ethers";
 
 // In-memory mock database for testing
@@ -113,6 +114,7 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
   const holder2Wallet = ethers.Wallet.createRandom();
   const holder3Wallet = ethers.Wallet.createRandom();
   const unassignedHolderWallet = ethers.Wallet.createRandom();
+  const centreWallet = ethers.Wallet.createRandom();
 
   const sampleMeta = {
     title: "National Entrance Examination 2026",
@@ -129,6 +131,12 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
 
   // Dynamic state for contract mock
   let examState = 0; // 0 = Draft, 1 = Collecting
+  let centreAssigned = false;
+  let examSchedule = {
+    releaseOpensAt: 1770000000n,
+    examStartsAt: 1770003600n,
+    examEndsAt: 1770014400n,
+  };
 
   const mockContract = {
     getExam: vi.fn().mockImplementation((examId: bigint) => {
@@ -138,9 +146,7 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
           state: examState,
           authority: authorityWallet.address,
           metaHash: expectedMetaHash,
-          releaseOpensAt: 1770000000n,
-          examStartsAt: 1770003600n,
-          examEndsAt: 1770014400n,
+          ...examSchedule,
           threshold: 2,
           holderCount: 3,
           bankHash: ethers.ZeroHash,
@@ -154,7 +160,7 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
         return Promise.resolve([
           [holder1Wallet.address, holder2Wallet.address, holder3Wallet.address],
           [], // setters
-          [], // centres
+          centreAssigned ? [centreWallet.address] : [], // centres
         ]);
       }
       throw new Error("ExamNotFound");
@@ -163,6 +169,7 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
       const norm = ethers.getAddress(account);
       const authorityRole = ethers.keccak256(ethers.toUtf8Bytes("AUTHORITY_ROLE"));
       const holderRole = ethers.keccak256(ethers.toUtf8Bytes("HOLDER_ROLE"));
+      const centreRole = ethers.keccak256(ethers.toUtf8Bytes("CENTRE_ROLE"));
 
       if (roleHash === authorityRole) {
         return Promise.resolve(
@@ -177,6 +184,9 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
           norm === ethers.getAddress(holder3Wallet.address) ||
           norm === ethers.getAddress(unassignedHolderWallet.address)
         );
+      }
+      if (roleHash === centreRole) {
+        return Promise.resolve(norm === ethers.getAddress(centreWallet.address));
       }
       return Promise.resolve(false);
     }),
@@ -211,6 +221,13 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
     mockShares.clear();
     mockPanel.clear();
     examState = 0; // reset to Draft
+    centreAssigned = false;
+    examSchedule = {
+      releaseOpensAt: 1770000000n,
+      examStartsAt: 1770003600n,
+      examEndsAt: 1770014400n,
+    };
+    clearRoleCache();
 
     // Seed mock exam 1
     mockExams.set("1", {
@@ -283,6 +300,7 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
     expect(detailRes.body.metaJson).toBeUndefined();
     expect(detailRes.body.id).toBeUndefined(); // no internal database UUID
     expect(detailRes.body.shares).toBeUndefined(); // no shares
+    expect(detailRes.body.seed).toBeUndefined();
 
     // Unauthenticated GET /api/exams
     const listRes = await request(app).get("/api/exams");
@@ -290,6 +308,23 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
     expect(Array.isArray(listRes.body)).toBe(true);
     expect(listRes.body[0].metaJson).toBeUndefined();
     expect(listRes.body[0].id).toBeUndefined();
+    expect(listRes.body[0].seed).toBeUndefined();
+  });
+
+  it("does not expose a legacy Exam.seed field in authenticated exam DTOs", async () => {
+    const row = mockExams.get("1");
+    mockExams.set("1", { ...row, seed: "sensitive-legacy-value" });
+    const app = createApp(validConfig, undefined, mockContract);
+    const agent = request.agent(app);
+    await loginAs(agent, authorityWallet);
+
+    const detail = await agent.get("/api/exams/1");
+    expect(detail.status).toBe(200);
+    expect(detail.body.seed).toBeUndefined();
+    const list = await agent.get("/api/exams");
+    expect(list.status).toBe(200);
+    expect(list.body[0].seed).toBeUndefined();
+    expect(JSON.stringify(detail.body)).not.toContain("sensitive-legacy-value");
   });
 
   it("should return 403 on GET /api/exams/:id for unassigned authenticated holder", async () => {
@@ -450,5 +485,39 @@ describe("Exam Metadata & Shares Endpoints (BE-04 & BE-06)", () => {
     const res = await agent.get("/api/exams/1/shares/me");
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("validates Centre assignment and schedule before blocking on unavailable protected print services", async () => {
+    const app = createApp(validConfig, undefined, mockContract);
+    const agent = request.agent(app);
+    await loginAs(agent, centreWallet);
+    examState = 3;
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    examSchedule = { releaseOpensAt: now - 60n, examStartsAt: now + 60n, examEndsAt: now + 3600n };
+
+    const notAssigned = await agent.post("/api/exams/1/centre-paper/request").send({ intent: "generate" });
+    expect(notAssigned.status).toBe(403);
+    expect(notAssigned.body.error.code).toBe("CENTRE_NOT_ASSIGNED");
+
+    centreAssigned = true;
+    examSchedule = { releaseOpensAt: now + 120n, examStartsAt: now + 180n, examEndsAt: now + 3600n };
+    const early = await agent.post("/api/exams/1/centre-paper/request").send({ intent: "generate" });
+    expect(early.status).toBe(423);
+    expect(early.body.error.code).toBe("PRINT_WINDOW_CLOSED");
+
+    examSchedule = { releaseOpensAt: now - 60n, examStartsAt: now + 60n, examEndsAt: now + 3600n };
+    const blocked = await agent.post("/api/exams/1/centre-paper/request").send({ intent: "generate" });
+    expect(blocked.status).toBe(503);
+    expect(blocked.body.error.code).toBe("PROTECTED_PRINT_SERVICE_UNAVAILABLE");
+    expect(JSON.stringify(blocked.body)).not.toMatch(/seed|private scalar|share|answer key/i);
+  });
+
+  it("requires a reason for a Centre reprint request", async () => {
+    const app = createApp(validConfig, undefined, mockContract);
+    const agent = request.agent(app);
+    await loginAs(agent, centreWallet);
+    const res = await agent.post("/api/exams/1/centre-paper/request").send({ intent: "reprint" });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("INVALID_REQUEST");
   });
 });

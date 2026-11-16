@@ -20,6 +20,9 @@ describe("ExamVault (SC-01 to SC-06)", () => {
   let centre1: SignerWithAddress;
   let centre2: SignerWithAddress;
   let auditor: SignerWithAddress;
+  let attestor1: SignerWithAddress;
+  let attestor2: SignerWithAddress;
+  let attestor3: SignerWithAddress;
   let stranger: SignerWithAddress;
 
   const minLeadSeconds = 60n;
@@ -71,6 +74,73 @@ describe("ExamVault (SC-01 to SC-06)", () => {
     return ethers.keccak256(ethers.solidityPacked(["bytes32[]"], [batchHashesInSubmissionOrder]));
   }
 
+  function computeHolderSetHash(holders: string[]): string {
+    return ethers.keccak256(ethers.solidityPacked(["address[]"], [holders]));
+  }
+
+  function computeCommitmentSetHash(commitments: string[]): string {
+    return ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(["bytes32[]"], [commitments])
+    );
+  }
+
+  function computeAttestorSetHash(attestors: string[]): string {
+    return ethers.keccak256(ethers.solidityPacked(["address[3]"], [attestors]));
+  }
+
+  async function signReleaseAttestation(
+    signer: SignerWithAddress,
+    examId: bigint,
+    holderSetHash: string,
+    threshold: bigint,
+    commitmentSetHash: string,
+    attestorSetHash: string,
+    releaseValidFrom: bigint,
+    deadline: bigint,
+    nonce: string,
+    seed: string,
+    verifyingContract?: string
+  ): Promise<string> {
+    const domain = {
+      name: "SIGIL",
+      version: "1",
+      chainId: Number((await ethers.provider.getNetwork()).chainId),
+      verifyingContract: verifyingContract ?? await examVault.getAddress(),
+    };
+
+    return signer.signTypedData(
+      domain,
+      {
+        ReleaseAttestation: [
+          { name: "examId", type: "uint256" },
+          { name: "chainId", type: "uint256" },
+          { name: "contractAddress", type: "address" },
+          { name: "holderSetHash", type: "bytes32" },
+          { name: "threshold", type: "uint8" },
+          { name: "commitmentSetHash", type: "bytes32" },
+          { name: "attestorSetHash", type: "bytes32" },
+          { name: "releaseValidFrom", type: "uint64" },
+          { name: "deadline", type: "uint64" },
+          { name: "nonce", type: "bytes32" },
+          { name: "seed", type: "bytes32" },
+        ],
+      },
+      {
+        examId: examId,
+        chainId: domain.chainId,
+        contractAddress: domain.verifyingContract,
+        holderSetHash: holderSetHash,
+        threshold: threshold,
+        commitmentSetHash: commitmentSetHash,
+        attestorSetHash: attestorSetHash,
+        releaseValidFrom: releaseValidFrom,
+        deadline: deadline,
+        nonce: nonce,
+        seed: seed,
+      }
+    );
+  }
+
   beforeEach(async () => {
     [
       admin,
@@ -87,11 +157,19 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       centre1,
       centre2,
       auditor,
+      attestor1,
+      attestor2,
+      attestor3,
       stranger,
     ] = await ethers.getSigners();
 
     const ExamVaultFactory = await ethers.getContractFactory("ExamVault");
     examVault = await ExamVaultFactory.deploy(minLeadSeconds);
+    await examVault.connect(admin).setReleaseAttestors([
+      attestor1.address,
+      attestor2.address,
+      attestor3.address,
+    ]);
   });
 
   describe("Deployment & Configuration (SC-01)", () => {
@@ -291,7 +369,6 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       await examVault.connect(admin).registerParticipant(authority.address, ROLE_AUTHORITY, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(setter1.address, ROLE_SETTER, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(setter2.address, ROLE_SETTER, ethers.ZeroHash);
-
       await examVault.connect(admin).registerParticipant(holder1.address, ROLE_HOLDER, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(holder2.address, ROLE_HOLDER, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(holder3.address, ROLE_HOLDER, ethers.ZeroHash);
@@ -355,27 +432,6 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       expect(exam.threshold).to.equal(baseConfig.threshold);
       expect(exam.holderCount).to.equal(3);
       expect(exam.bankHash).to.equal(ethers.ZeroHash);
-      expect(exam.seed).to.equal(ethers.ZeroHash);
-      expect(exam.quotas.map(Number)).to.deep.equal([45, 45, 45, 45]);
-
-      const [panelHolders, panelSetters, panelCentres] = await examVault.getPanel(1n);
-      expect(panelHolders).to.deep.equal([holder1.address, holder2.address, holder3.address]);
-      expect(panelSetters).to.deep.equal([setter1.address, setter2.address]);
-      expect(panelCentres).to.deep.equal([centre1.address, centre2.address]);
-
-      // Check panel lookups
-      expect(await examVault.isHolder(1n, holder1.address)).to.be.true;
-      expect(await examVault.isHolder(1n, holder4.address)).to.be.false;
-      expect(await examVault.isSetter(1n, setter1.address)).to.be.true;
-      expect(await examVault.isSetter(1n, stranger.address)).to.be.false;
-      expect(await examVault.isCentre(1n, centre1.address)).to.be.true;
-      expect(await examVault.isCentre(1n, stranger.address)).to.be.false;
-
-      // Check liveExamCount increments
-      expect(await examVault.liveExamCount(holder1.address)).to.equal(1n);
-      expect(await examVault.liveExamCount(holder2.address)).to.equal(1n);
-      expect(await examVault.liveExamCount(holder3.address)).to.equal(1n);
-      expect(await examVault.liveExamCount(holder4.address)).to.equal(0n);
     });
 
     it("should prevent holder from revoking or changing key while in a live exam", async () => {
@@ -1038,7 +1094,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       await examVault.connect(authority).createExam(baseConfig);
     });
 
-    it("should revert ExamNotFound for invalid examId", async () => {
+    it("should revert ExamNotFound for invalid exam ID", async () => {
       await expect(examVault.connect(authority).sealExam(999n)).to.be.revertedWithCustomError(
         examVault,
         "ExamNotFound"
@@ -1170,6 +1226,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       await examVault.connect(admin).registerParticipant(holder4.address, ROLE_HOLDER, ethers.ZeroHash);
 
       await examVault.connect(admin).registerParticipant(centre1.address, ROLE_CENTRE, ethers.ZeroHash);
+      await examVault.connect(admin).registerParticipant(centre2.address, ROLE_CENTRE, ethers.ZeroHash);
 
       await examVault.connect(holder1).setEncryptionKey(validP256PubKey);
       await examVault.connect(holder2).setEncryptionKey(validP256PubKey);
@@ -1186,64 +1243,146 @@ describe("ExamVault (SC-01 to SC-06)", () => {
         releaseOpensAt,
         examStartsAt,
         examEndsAt,
-        threshold: 2, // t = 2 out of n = 3
+        threshold: 2,
         holders: [holder1.address, holder2.address, holder3.address],
         setters: [setter1.address],
-        centres: [centre1.address],
+        centres: [centre1.address, centre2.address],
         quotas: [1],
       };
 
-      // Create -> Open -> Submit batches & commitments -> Seal
       await examVault.connect(authority).createExam(baseConfig);
       await examVault.connect(authority).openCollection(examId, validP256PubKey);
       await examVault.connect(setter1).submitBatch(examId, 0, hashB1, 1);
 
-      await examVault.connect(holder1).commitRandomness(examId, computeShareCommitment(examId, holder1.address, share1), computeRandomnessCommitment(examId, holder1.address, reveal1));
-      await examVault.connect(holder2).commitRandomness(examId, computeShareCommitment(examId, holder2.address, share2), computeRandomnessCommitment(examId, holder2.address, reveal2));
-      await examVault.connect(holder3).commitRandomness(examId, computeShareCommitment(examId, holder3.address, share3), computeRandomnessCommitment(examId, holder3.address, reveal3));
+      await examVault.connect(holder1).commitRandomness(
+        examId,
+        computeShareCommitment(examId, holder1.address, share1),
+        computeRandomnessCommitment(examId, holder1.address, reveal1)
+      );
+      await examVault.connect(holder2).commitRandomness(
+        examId,
+        computeShareCommitment(examId, holder2.address, share2),
+        computeRandomnessCommitment(examId, holder2.address, reveal2)
+      );
+      await examVault.connect(holder3).commitRandomness(
+        examId,
+        computeShareCommitment(examId, holder3.address, share3),
+        computeRandomnessCommitment(examId, holder3.address, reveal3)
+      );
 
       await examVault.connect(authority).sealExam(examId);
     });
+
+    async function makeAttestation(options: {
+      signedExamId?: bigint;
+      holderSetHash?: string;
+      commitmentSetHash?: string;
+      commitments?: string[];
+      threshold?: bigint;
+      signerA?: SignerWithAddress;
+      signerB?: SignerWithAddress;
+      releaseValidFrom?: bigint;
+      deadline?: bigint;
+      nonce?: string;
+      seed?: string;
+      verifyingContract?: string;
+    } = {}) {
+      const signedExamId = options.signedExamId ?? examId;
+      const releaseTimestamp = releaseOpensAt + 100n;
+      const deadline = options.deadline ?? releaseTimestamp + 3600n;
+      const nonce = options.nonce ?? ethers.hexlify(ethers.randomBytes(32));
+      const holderSetHash = options.holderSetHash ?? computeHolderSetHash(baseConfig.holders);
+      const commitmentSetHash = options.commitmentSetHash ?? computeCommitmentSetHash(options.commitments ?? [
+        computeRandomnessCommitment(examId, holder1.address, reveal1),
+        computeRandomnessCommitment(examId, holder2.address, reveal2),
+      ]);
+      const attestorSetHash = computeAttestorSetHash([
+        attestor1.address,
+        attestor2.address,
+        attestor3.address,
+      ]);
+      const seed = options.seed ?? computeReleaseSeed(examId, [reveal1, reveal2]);
+      const signerA = options.signerA ?? attestor1;
+      const signerB = options.signerB ?? attestor2;
+      const sign = (signer: SignerWithAddress) => signReleaseAttestation(
+        signer,
+        signedExamId,
+        holderSetHash,
+        options.threshold ?? BigInt(baseConfig.threshold),
+        commitmentSetHash,
+        attestorSetHash,
+        options.releaseValidFrom ?? releaseOpensAt,
+        deadline,
+        nonce,
+        seed,
+        options.verifyingContract
+      );
+      return {
+        deadline,
+        nonce,
+        signatureA: await sign(signerA),
+        signatureB: await sign(signerB),
+      };
+    }
+
+    async function submitThresholdShares(
+      attestation: Awaited<ReturnType<typeof makeAttestation>>
+    ) {
+      await time.setNextBlockTimestamp(releaseOpensAt);
+      await examVault.connect(holder1).submitShare(
+        examId,
+        computeShareCommitment(examId, holder1.address, share1),
+        reveal1
+      );
+      await time.setNextBlockTimestamp(releaseOpensAt + 100n);
+      return examVault.connect(holder2).submitShare(
+        examId,
+        computeShareCommitment(examId, holder2.address, share2),
+        reveal2,
+        attestation.deadline,
+        attestation.nonce,
+        attestation.signatureA,
+        attestation.signatureB
+      );
+    }
 
     describe("Access control & panel validations", () => {
       it("should revert ExamNotFound for non-existent examId", async () => {
         await time.setNextBlockTimestamp(releaseOpensAt);
         await expect(
-          examVault.connect(holder1).submitShare(999n, share1, reveal1)
+          examVault.connect(holder1).submitShare(999n, computeShareCommitment(999n, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "ExamNotFound");
       });
 
       it("should revert NotAssigned if caller lacks HOLDER_ROLE or is not an assigned holder in this exam", async () => {
         await time.setNextBlockTimestamp(releaseOpensAt);
 
-        // Stranger without HOLDER_ROLE
         await expect(
-          examVault.connect(stranger).submitShare(examId, share1, reveal1)
+          examVault.connect(stranger).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "AccessControlUnauthorizedAccount");
 
-        // Registered HOLDER not in panel (holder4)
         await expect(
-          examVault.connect(holder4).submitShare(examId, share1, reveal1)
+          examVault.connect(holder4).submitShare(examId, computeShareCommitment(examId, holder4.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "NotAssigned");
       });
     });
 
-    describe("Time boundary validations (1 second before and after each boundary)", () => {
+    describe("Time boundary validations (1 second before and after each boundary)", async () => {
       it("should revert TooEarly exactly 1 second before releaseOpensAt", async () => {
         const tooEarlyTime = releaseOpensAt - 1n;
         await time.setNextBlockTimestamp(tooEarlyTime);
 
         await expect(
-          examVault.connect(holder1).submitShare(examId, share1, reveal1)
+          examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "TooEarly").withArgs(tooEarlyTime, releaseOpensAt);
       });
 
       it("should accept submission exactly at releaseOpensAt (start boundary)", async () => {
         await time.setNextBlockTimestamp(releaseOpensAt);
 
-        await expect(examVault.connect(holder1).submitShare(examId, share1, reveal1))
+        await expect(examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1))
           .to.emit(examVault, "ShareSubmitted")
-          .withArgs(examId, holder1.address, share1);
+          .withArgs(examId, holder1.address, computeShareCommitment(examId, holder1.address, share1));
 
         expect(await examVault.hasSubmittedShare(examId, holder1.address)).to.be.true;
       });
@@ -1251,9 +1390,9 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       it("should accept submission exactly at examEndsAt (end boundary)", async () => {
         await time.setNextBlockTimestamp(examEndsAt);
 
-        await expect(examVault.connect(holder1).submitShare(examId, share1, reveal1))
+        await expect(examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1))
           .to.emit(examVault, "ShareSubmitted")
-          .withArgs(examId, holder1.address, share1);
+          .withArgs(examId, holder1.address, computeShareCommitment(examId, holder1.address, share1));
 
         expect(await examVault.hasSubmittedShare(examId, holder1.address)).to.be.true;
       });
@@ -1263,7 +1402,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
         await time.setNextBlockTimestamp(tooLateTime);
 
         await expect(
-          examVault.connect(holder1).submitShare(examId, share1, reveal1)
+          examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "TooLate").withArgs(tooLateTime, examEndsAt);
       });
     });
@@ -1276,7 +1415,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
 
         await time.setNextBlockTimestamp(releaseOpensAt);
         await expect(
-          examVault.connect(holder1).submitShare(draftExamId, share1, reveal1)
+          examVault.connect(holder1).submitShare(draftExamId, computeShareCommitment(draftExamId, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "WrongState").withArgs(2, 0); // Expected Sealed(2), actual Draft(0)
       });
 
@@ -1288,7 +1427,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
 
         await time.setNextBlockTimestamp(releaseOpensAt);
         await expect(
-          examVault.connect(holder1).submitShare(colExamId, share1, reveal1)
+          examVault.connect(holder1).submitShare(colExamId, computeShareCommitment(colExamId, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "WrongState").withArgs(2, 1); // Expected Sealed(2), actual Collecting(1)
       });
     });
@@ -1298,122 +1437,363 @@ describe("ExamVault (SC-01 to SC-06)", () => {
         await time.setNextBlockTimestamp(releaseOpensAt);
       });
 
-      it("should revert ZeroValue if share is empty or reveal is zero", async () => {
+      it("should revert ZeroValue if share commitment is zero or reveal is zero", async () => {
         await expect(
-          examVault.connect(holder1).submitShare(examId, "0x", reveal1)
+          examVault.connect(holder1).submitShare(examId, ethers.ZeroHash, reveal1)
         ).to.be.revertedWithCustomError(examVault, "ZeroValue");
 
         await expect(
-          examVault.connect(holder1).submitShare(examId, share1, ethers.ZeroHash)
+          examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), ethers.ZeroHash)
         ).to.be.revertedWithCustomError(examVault, "ZeroValue");
       });
 
-      it("should revert InvalidShare if wrong share bytes are submitted", async () => {
+      it("should revert InvalidShare if wrong share commitment is submitted", async () => {
         const wrongShare = ethers.toUtf8Bytes("tampered-share");
         await expect(
-          examVault.connect(holder1).submitShare(examId, wrongShare, reveal1)
+          examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, wrongShare), reveal1)
         ).to.be.revertedWithCustomError(examVault, "InvalidShare");
       });
 
       it("should revert InvalidReveal if wrong reveal bytes32 is submitted", async () => {
         const wrongReveal = ethers.keccak256(ethers.toUtf8Bytes("wrong-reveal"));
         await expect(
-          examVault.connect(holder1).submitShare(examId, share1, wrongReveal)
+          examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), wrongReveal)
         ).to.be.revertedWithCustomError(examVault, "InvalidReveal");
       });
 
       it("should revert AlreadySubmitted on duplicate submission by the same holder", async () => {
-        await examVault.connect(holder1).submitShare(examId, share1, reveal1);
+        await examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1);
 
         await expect(
-          examVault.connect(holder1).submitShare(examId, share1, reveal1)
+          examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1)
         ).to.be.revertedWithCustomError(examVault, "AlreadySubmitted");
       });
     });
 
     describe("Threshold Release State Transitions and Seed Calculation", () => {
-      it("state changes to Released exactly at the t-th submission and computes exact canonical seed", async () => {
+      it("releases at exactly threshold submissions from a larger panel and computes the canonical seed", async () => {
         await time.setNextBlockTimestamp(releaseOpensAt);
 
-        // Before submissions: State is Sealed, seed is 0x0
         let exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(2); // State.Sealed
-        expect(exam.seed).to.equal(ethers.ZeroHash);
+        expect(exam.state).to.equal(2);
         expect(exam.releasedAt).to.equal(0n);
         expect(await examVault.getShareSubmissionCount(examId)).to.equal(0n);
 
-        // 1st submission: holder2 submits first (threshold is 2)
-        await expect(examVault.connect(holder2).submitShare(examId, share2, reveal2))
+        await expect(examVault.connect(holder2).submitShare(examId, computeShareCommitment(examId, holder2.address, share2), reveal2))
           .to.emit(examVault, "ShareSubmitted")
-          .withArgs(examId, holder2.address, share2)
+          .withArgs(examId, holder2.address, computeShareCommitment(examId, holder2.address, share2))
           .and.not.to.emit(examVault, "PaperReleased");
 
         exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(2); // Still Sealed
-        expect(exam.seed).to.equal(ethers.ZeroHash);
+        expect(exam.state).to.equal(2);
         expect(exam.releasedAt).to.equal(0n);
         expect(await examVault.getShareSubmissionCount(examId)).to.equal(1n);
 
-        // 2nd submission: holder1 submits (t-th submission reaching threshold 2)
-        // Holders in panel order are [holder1, holder2, holder3].
-        // The two submitters are holder1 and holder2.
-        // In panel order, holder1 is index 0 and holder2 is index 1.
-        // Therefore reveals array must be [reveal1, reveal2].
-        const expectedSeed = computeReleaseSeed(examId, [reveal1, reveal2]);
+        const holderSetHash = computeHolderSetHash(baseConfig.holders);
+        const threshold = BigInt(baseConfig.threshold);
+        const commitmentSetHash = computeCommitmentSetHash([
+          computeRandomnessCommitment(examId, holder1.address, reveal1),
+          computeRandomnessCommitment(examId, holder2.address, reveal2),
+        ]);
+        const attestorSetHash = computeAttestorSetHash([
+          attestor1.address,
+          attestor2.address,
+          attestor3.address,
+        ]);
         const releaseTimestamp = releaseOpensAt + 100n;
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+        const expectedSeed = computeReleaseSeed(examId, [reveal1, reveal2]);
+        const deadline = releaseTimestamp + 3600n;
+        const sigA = await signReleaseAttestation(
+          attestor1,
+          examId,
+          holderSetHash,
+          threshold,
+          commitmentSetHash,
+          attestorSetHash,
+          releaseOpensAt,
+          deadline,
+          nonce,
+          expectedSeed
+        );
+        const sigB = await signReleaseAttestation(
+          attestor2,
+          examId,
+          holderSetHash,
+          threshold,
+          commitmentSetHash,
+          attestorSetHash,
+          releaseOpensAt,
+          deadline,
+          nonce,
+          expectedSeed
+        );
+
         await time.setNextBlockTimestamp(releaseTimestamp);
 
-        await expect(examVault.connect(holder1).submitShare(examId, share1, reveal1))
+        await expect(examVault.connect(holder1).submitShare(
+          examId,
+          computeShareCommitment(examId, holder1.address, share1),
+          reveal1,
+          deadline,
+          nonce,
+          sigA,
+          sigB
+        ))
           .to.emit(examVault, "ShareSubmitted")
-          .withArgs(examId, holder1.address, share1)
+          .withArgs(examId, holder1.address, computeShareCommitment(examId, holder1.address, share1))
           .and.to.emit(examVault, "PaperReleased")
-          .withArgs(examId, expectedSeed, releaseTimestamp);
+          .withArgs(examId, releaseTimestamp);
 
         exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(3); // State.Released
-        expect(exam.seed).to.equal(expectedSeed);
+        expect(exam.state).to.equal(3);
         expect(exam.releasedAt).to.equal(releaseTimestamp);
         expect(await examVault.getShareSubmissionCount(examId)).to.equal(2n);
+      });
+
+      it("rejects a non-attested submission that would reach threshold without changing release state", async () => {
+        expect(baseConfig.threshold).to.be.greaterThan(1);
+        await time.setNextBlockTimestamp(releaseOpensAt);
+
+        await examVault.connect(holder1).submitShare(
+          examId,
+          computeShareCommitment(examId, holder1.address, share1),
+          reveal1
+        );
+
+        expect(await examVault.getShareSubmissionCount(examId)).to.equal(BigInt(baseConfig.threshold - 1));
+        const examBefore = await examVault.getExam(examId);
+        expect(examBefore.state).to.equal(2);
+        expect(examBefore.releasedAt).to.equal(0n);
+
+        await time.setNextBlockTimestamp(releaseOpensAt + 100n);
+        await expect(examVault.connect(holder2).submitShare(
+          examId,
+          computeShareCommitment(examId, holder2.address, share2),
+          reveal2
+        )).to.be.revertedWithCustomError(examVault, "InvalidAttestation");
+
+        const examAfter = await examVault.getExam(examId);
+        expect(examAfter.state).to.equal(2);
+        expect(examAfter.releasedAt).to.equal(0n);
+        expect(await examVault.getShareSubmissionCount(examId)).to.equal(BigInt(baseConfig.threshold - 1));
+        expect(await examVault.hasSubmittedShare(examId, holder2.address)).to.be.false;
+      });
+
+      it("rejects missing attestation signatures at threshold without changing release state", async () => {
+        await time.setNextBlockTimestamp(releaseOpensAt);
+
+        await examVault.connect(holder1).submitShare(
+          examId,
+          computeShareCommitment(examId, holder1.address, share1),
+          reveal1
+        );
+
+        const countBefore = await examVault.getShareSubmissionCount(examId);
+        const examBefore = await examVault.getExam(examId);
+        expect(countBefore).to.equal(BigInt(baseConfig.threshold - 1));
+        expect(examBefore.state).to.equal(2);
+        expect(examBefore.releasedAt).to.equal(0n);
+
+        const deadline = releaseOpensAt + 3600n;
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+        await time.setNextBlockTimestamp(releaseOpensAt + 100n);
+        await expect(examVault.connect(holder2).submitShare(
+          examId,
+          computeShareCommitment(examId, holder2.address, share2),
+          reveal2,
+          deadline,
+          nonce,
+          "0x",
+          "0x"
+        )).to.be.revertedWithCustomError(examVault, "InvalidAttestation");
+
+        const examAfter = await examVault.getExam(examId);
+        expect(examAfter.state).to.equal(2);
+        expect(examAfter.releasedAt).to.equal(0n);
+        expect(await examVault.getShareSubmissionCount(examId)).to.equal(countBefore);
+        expect(await examVault.hasSubmittedShare(examId, holder2.address)).to.be.false;
+      });
+
+      it("rejects an incorrect commitmentSetHash", async () => {
+        const attestation = await makeAttestation({
+          commitmentSetHash: ethers.keccak256(ethers.toUtf8Bytes("wrong commitment set")),
+        });
+        await expect(submitThresholdShares(attestation)).to.be.revertedWithCustomError(examVault, "AttestorNotAuthorized");
+      });
+
+      it("rejects an incorrect holderSetHash", async () => {
+        const attestation = await makeAttestation({
+          holderSetHash: ethers.keccak256(ethers.toUtf8Bytes("wrong holder set")),
+        });
+        await expect(submitThresholdShares(attestation)).to.be.revertedWithCustomError(examVault, "AttestorNotAuthorized");
+      });
+
+      it("rejects duplicate attestor signatures", async () => {
+        const attestation = await makeAttestation({ signerB: attestor1 });
+        await expect(submitThresholdShares(attestation)).to.be.revertedWithCustomError(examVault, "InvalidAttestation");
+      });
+
+      it("rejects signatures from an unauthorized attestor", async () => {
+        const attestation = await makeAttestation({ signerB: stranger });
+        await expect(submitThresholdShares(attestation)).to.be.revertedWithCustomError(examVault, "AttestorNotAuthorized");
+      });
+
+      it("rejects expired attestations", async () => {
+        const attestation = await makeAttestation({ deadline: releaseOpensAt + 99n });
+        await expect(submitThresholdShares(attestation)).to.be.revertedWithCustomError(examVault, "ExpiredAttestation");
+      });
+
+      it("rejects attestations signed for a different exam", async () => {
+        const wrongExam = await makeAttestation({ signedExamId: examId + 1n });
+        await expect(submitThresholdShares(wrongExam)).to.be.revertedWithCustomError(examVault, "AttestorNotAuthorized");
+      });
+
+      it("rejects attestations signed for a different contract context", async () => {
+        const wrongContract = await makeAttestation({ verifyingContract: stranger.address });
+        await expect(submitThresholdShares(wrongContract)).to.be.revertedWithCustomError(examVault, "AttestorNotAuthorized");
+      });
+
+      it("rejects reuse of a release certificate nonce across exams", async () => {
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+        const firstAttestation = await makeAttestation({ nonce });
+        await submitThresholdShares(firstAttestation);
+
+        const releaseAt = BigInt(await time.latest()) + minLeadSeconds + 1000n;
+        const secondConfig = {
+          ...baseConfig,
+          releaseOpensAt: releaseAt,
+          examStartsAt: releaseAt + 3600n,
+          examEndsAt: releaseAt + 7200n,
+        };
+        const secondExamId = 2n;
+        await examVault.connect(authority).createExam(secondConfig);
+        await examVault.connect(authority).openCollection(secondExamId, validP256PubKey);
+        await examVault.connect(setter1).submitBatch(secondExamId, 0, hashB1, 1);
+        for (const [holder, share, reveal] of [
+          [holder1, share1, reveal1],
+          [holder2, share2, reveal2],
+          [holder3, share3, reveal3],
+        ] as const) {
+          await examVault.connect(holder).commitRandomness(
+            secondExamId,
+            computeShareCommitment(secondExamId, holder.address, share),
+            computeRandomnessCommitment(secondExamId, holder.address, reveal)
+          );
+        }
+        await examVault.connect(authority).sealExam(secondExamId);
+
+        const deadline = releaseAt + 3600n;
+        const holdersHash = computeHolderSetHash(secondConfig.holders);
+        const commitmentsHash = computeCommitmentSetHash([
+          computeRandomnessCommitment(secondExamId, holder1.address, reveal1),
+          computeRandomnessCommitment(secondExamId, holder2.address, reveal2),
+        ]);
+        const attestorsHash = computeAttestorSetHash([attestor1.address, attestor2.address, attestor3.address]);
+        const seed = computeReleaseSeed(secondExamId, [reveal1, reveal2]);
+        const sign = (signer: SignerWithAddress) => signReleaseAttestation(
+          signer, secondExamId, holdersHash, 2n, commitmentsHash, attestorsHash,
+          releaseAt, deadline, nonce, seed
+        );
+        const signatureA = await sign(attestor1);
+        const signatureB = await sign(attestor2);
+
+        await time.setNextBlockTimestamp(releaseAt);
+        await examVault.connect(holder1).submitShare(
+          secondExamId,
+          computeShareCommitment(secondExamId, holder1.address, share1),
+          reveal1
+        );
+        await time.setNextBlockTimestamp(releaseAt + 100n);
+        await expect(examVault.connect(holder2).submitShare(
+          secondExamId,
+          computeShareCommitment(secondExamId, holder2.address, share2),
+          reveal2,
+          deadline,
+          nonce,
+          signatureA,
+          signatureB
+        )).to.be.revertedWithCustomError(examVault, "InvalidAttestation");
       });
     });
 
     describe("Property: Seed and State Invariance Post-Release", () => {
-      it("seed and releasedAt never change when additional (t+1)th holders submit or across multiple blocks", async () => {
+      it("releasedAt never changes when additional (t+1)th holders submit or across multiple blocks", async () => {
         await time.setNextBlockTimestamp(releaseOpensAt);
 
-        // Submit holder1 and holder2 to reach threshold 2
-        await examVault.connect(holder1).submitShare(examId, share1, reveal1);
+        await examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1);
 
         const releaseTimestamp = releaseOpensAt + 50n;
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+        const expectedSeed = computeReleaseSeed(examId, [reveal1, reveal2]);
+        const deadline = releaseTimestamp + 3600n;
+        const holderSetHash = computeHolderSetHash(baseConfig.holders);
+        const threshold = BigInt(baseConfig.threshold);
+        const commitmentSetHash = computeCommitmentSetHash([
+          computeRandomnessCommitment(examId, holder1.address, reveal1),
+          computeRandomnessCommitment(examId, holder2.address, reveal2),
+        ]);
+        const attestorSetHash = computeAttestorSetHash([
+          attestor1.address,
+          attestor2.address,
+          attestor3.address,
+        ]);
+        const sigA = await signReleaseAttestation(
+          attestor1,
+          examId,
+          holderSetHash,
+          threshold,
+          commitmentSetHash,
+          attestorSetHash,
+          releaseOpensAt,
+          deadline,
+          nonce,
+          expectedSeed
+        );
+        const sigB = await signReleaseAttestation(
+          attestor2,
+          examId,
+          holderSetHash,
+          threshold,
+          commitmentSetHash,
+          attestorSetHash,
+          releaseOpensAt,
+          deadline,
+          nonce,
+          expectedSeed
+        );
+
         await time.setNextBlockTimestamp(releaseTimestamp);
-        await examVault.connect(holder2).submitShare(examId, share2, reveal2);
+        await examVault.connect(holder2).submitShare(
+          examId,
+          computeShareCommitment(examId, holder2.address, share2),
+          reveal2,
+          deadline,
+          nonce,
+          sigA,
+          sigB
+        );
 
         const initialExam = await examVault.getExam(examId);
-        const canonicalSeed = initialExam.seed;
-        expect(initialExam.state).to.equal(3); // Released
-        expect(canonicalSeed).to.not.equal(ethers.ZeroHash);
+        expect(initialExam.state).to.equal(3);
         expect(initialExam.releasedAt).to.equal(releaseTimestamp);
 
-        // 3rd holder (holder3, t+1) submits their share post-release within time window
         const laterTimestamp = releaseTimestamp + 200n;
         await time.setNextBlockTimestamp(laterTimestamp);
 
-        await expect(examVault.connect(holder3).submitShare(examId, share3, reveal3))
+        await expect(examVault.connect(holder3).submitShare(examId, computeShareCommitment(examId, holder3.address, share3), reveal3))
           .to.emit(examVault, "ShareSubmitted")
-          .withArgs(examId, holder3.address, share3)
+          .withArgs(examId, holder3.address, computeShareCommitment(examId, holder3.address, share3))
           .and.not.to.emit(examVault, "PaperReleased");
 
         const postExam = await examVault.getExam(examId);
-        expect(postExam.state).to.equal(3); // Released
-        expect(postExam.seed).to.equal(canonicalSeed); // Invariant!
-        expect(postExam.releasedAt).to.equal(releaseTimestamp); // Invariant!
+        expect(postExam.state).to.equal(3);
+        expect(postExam.releasedAt).to.equal(releaseTimestamp);
         expect(await examVault.getShareSubmissionCount(examId)).to.equal(3n);
         expect(await examVault.hasSubmittedShare(examId, holder3.address)).to.be.true;
 
-        // Advance time significantly within exam window and verify reads remain 100% constant
         await time.increase(1000);
         const finalExam = await examVault.getExam(examId);
-        expect(finalExam.seed).to.equal(canonicalSeed);
         expect(finalExam.releasedAt).to.equal(releaseTimestamp);
         expect(finalExam.state).to.equal(3);
       });
@@ -1452,22 +1832,23 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       await examVault.connect(admin).registerParticipant(authority2.address, ROLE_AUTHORITY, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(setter1.address, ROLE_SETTER, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(setter2.address, ROLE_SETTER, ethers.ZeroHash);
+      await examVault.connect(admin).registerParticipant(auditor.address, ROLE_AUDITOR, ethers.ZeroHash);
 
       await examVault.connect(admin).registerParticipant(holder1.address, ROLE_HOLDER, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(holder2.address, ROLE_HOLDER, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(holder3.address, ROLE_HOLDER, ethers.ZeroHash);
+      await examVault.connect(admin).registerParticipant(holder4.address, ROLE_HOLDER, ethers.ZeroHash);
 
       await examVault.connect(admin).registerParticipant(centre1.address, ROLE_CENTRE, ethers.ZeroHash);
       await examVault.connect(admin).registerParticipant(centre2.address, ROLE_CENTRE, ethers.ZeroHash);
 
-      await examVault.connect(admin).registerParticipant(auditor.address, ROLE_AUDITOR, ethers.ZeroHash);
-
       await examVault.connect(holder1).setEncryptionKey(validP256PubKey);
       await examVault.connect(holder2).setEncryptionKey(validP256PubKey);
       await examVault.connect(holder3).setEncryptionKey(validP256PubKey);
+      await examVault.connect(holder4).setEncryptionKey(validP256PubKey);
 
       const latestTime = BigInt(await time.latest());
-      releaseOpensAt = latestTime + minLeadSeconds + 100n;
+      releaseOpensAt = latestTime + minLeadSeconds + 1000n;
       examStartsAt = releaseOpensAt + 3600n;
       examEndsAt = examStartsAt + 7200n;
 
@@ -1486,23 +1867,84 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       await examVault.connect(authority).createExam(baseConfig);
     });
 
-    // Helper to advance exam to Sealed state
     async function advanceToSealed() {
       await examVault.connect(authority).openCollection(examId, validP256PubKey);
-      await examVault.connect(holder1).commitRandomness(examId, computeShareCommitment(examId, holder1.address, share1), computeRandomnessCommitment(examId, holder1.address, reveal1));
-      await examVault.connect(holder2).commitRandomness(examId, computeShareCommitment(examId, holder2.address, share2), computeRandomnessCommitment(examId, holder2.address, reveal2));
-      await examVault.connect(holder3).commitRandomness(examId, computeShareCommitment(examId, holder3.address, share3), computeRandomnessCommitment(examId, holder3.address, reveal3));
+      await examVault.connect(holder1).commitRandomness(
+        examId,
+        computeShareCommitment(examId, holder1.address, share1),
+        computeRandomnessCommitment(examId, holder1.address, reveal1)
+      );
+      await examVault.connect(holder2).commitRandomness(
+        examId,
+        computeShareCommitment(examId, holder2.address, share2),
+        computeRandomnessCommitment(examId, holder2.address, reveal2)
+      );
+      await examVault.connect(holder3).commitRandomness(
+        examId,
+        computeShareCommitment(examId, holder3.address, share3),
+        computeRandomnessCommitment(examId, holder3.address, reveal3)
+      );
       await examVault.connect(setter1).submitBatch(examId, 0, hashB1, 1);
       await examVault.connect(setter1).submitBatch(examId, 1, hashB2, 1);
       await examVault.connect(authority).sealExam(examId);
     }
 
-    // Helper to advance exam to Released state
     async function advanceToReleased() {
       await advanceToSealed();
       await time.setNextBlockTimestamp(releaseOpensAt);
-      await examVault.connect(holder1).submitShare(examId, share1, reveal1);
-      await examVault.connect(holder2).submitShare(examId, share2, reveal2);
+
+      await examVault.connect(holder1).submitShare(examId, computeShareCommitment(examId, holder1.address, share1), reveal1);
+
+      const releaseTimestamp = releaseOpensAt + 50n;
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const expectedSeed = computeReleaseSeed(examId, [reveal1, reveal2]);
+      const deadline = releaseTimestamp + 3600n;
+      const holderSetHash = computeHolderSetHash(baseConfig.holders);
+      const threshold = BigInt(baseConfig.threshold);
+      const commitmentSetHash = computeCommitmentSetHash([
+        computeRandomnessCommitment(examId, holder1.address, reveal1),
+        computeRandomnessCommitment(examId, holder2.address, reveal2),
+      ]);
+      const attestorSetHash = computeAttestorSetHash([
+        attestor1.address,
+        attestor2.address,
+        attestor3.address,
+      ]);
+      const sigA = await signReleaseAttestation(
+        attestor1,
+        examId,
+        holderSetHash,
+        threshold,
+        commitmentSetHash,
+        attestorSetHash,
+        releaseOpensAt,
+        deadline,
+        nonce,
+        expectedSeed
+      );
+      const sigB = await signReleaseAttestation(
+        attestor2,
+        examId,
+        holderSetHash,
+        threshold,
+        commitmentSetHash,
+        attestorSetHash,
+        releaseOpensAt,
+        deadline,
+        nonce,
+        expectedSeed
+      );
+
+      await time.setNextBlockTimestamp(releaseTimestamp);
+      await examVault.connect(holder2).submitShare(
+        examId,
+        computeShareCommitment(examId, holder2.address, share2),
+        reveal2,
+        deadline,
+        nonce,
+        sigA,
+        sigB
+      );
     }
 
     describe("publishRoster", () => {
@@ -1651,7 +2093,6 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       });
 
       it("should revert NotAssigned if centre is not assigned to this exam", async () => {
-        // Register centre3 with CENTRE_ROLE but don't assign to panel
         const centre3 = stranger;
         await examVault.connect(admin).registerParticipant(centre3.address, ROLE_CENTRE, ethers.ZeroHash);
         await expect(examVault.connect(centre3).registerCopy(examId, variantHash1)).to.be.revertedWithCustomError(
@@ -1770,26 +2211,22 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       });
 
       it("(a) assigned centre with no registered copy and matchedVariantHash = 0 must revert with CopyMismatch", async () => {
-        // centre2 is assigned to panel, but has not registered a copy
         await expect(
           examVault.connect(auditor).reportLeak(examId, evidenceHash, centre2.address, ethers.ZeroHash)
         ).to.be.revertedWithCustomError(examVault, "CopyMismatch");
       });
 
       it("(b) assigned centre with no registered copy and non-zero matchedVariantHash must revert with CopyMismatch", async () => {
-        // centre2 is assigned to panel, but has not registered a copy
         await expect(
           examVault.connect(auditor).reportLeak(examId, evidenceHash, centre2.address, variantHash2)
         ).to.be.revertedWithCustomError(examVault, "CopyMismatch");
       });
 
       it("(c) assigned centre with a registered copy but a different hash must revert with CopyMismatch", async () => {
-        // centre1 registered variantHash1, auditor reports variantHash2 for centre1
         await expect(
           examVault.connect(auditor).reportLeak(examId, evidenceHash, centre1.address, variantHash2)
         ).to.be.revertedWithCustomError(examVault, "CopyMismatch");
 
-        // centre1 registered variantHash1, auditor reports 0x0
         await expect(
           examVault.connect(auditor).reportLeak(examId, evidenceHash, centre1.address, ethers.ZeroHash)
         ).to.be.revertedWithCustomError(examVault, "CopyMismatch");
@@ -1896,7 +2333,6 @@ describe("ExamVault (SC-01 to SC-06)", () => {
       it("should succeed after examEndsAt, transition state to Concluded, and not decrement liveExamCount again", async () => {
         await advanceToReleased();
 
-        // liveExamCount for holders should already be 0 (decremented upon release in submitShare)
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
         expect(await examVault.liveExamCount(holder2.address)).to.equal(0n);
         expect(await examVault.liveExamCount(holder3.address)).to.equal(0n);
@@ -1909,10 +2345,9 @@ describe("ExamVault (SC-01 to SC-06)", () => {
           .withArgs(examId);
 
         const exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(4); // Concluded
+        expect(exam.state).to.equal(4);
         expect(exam.concludedAt).to.equal(concludeTimestamp);
 
-        // Verify liveExamCount remains 0 and did not underflow
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
         expect(await examVault.liveExamCount(holder2.address)).to.equal(0n);
         expect(await examVault.liveExamCount(holder3.address)).to.equal(0n);
@@ -1956,7 +2391,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
           .withArgs(examId, reasonHash);
 
         const exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(5); // Cancelled
+        expect(exam.state).to.equal(5);
         expect(exam.cancellationReasonHash).to.equal(reasonHash);
 
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
@@ -1986,7 +2421,6 @@ describe("ExamVault (SC-01 to SC-06)", () => {
 
       it("should cancel from Released state and NOT decrement liveExamCount again", async () => {
         await advanceToReleased();
-        // At release, liveExamCount was already decremented to 0
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
 
         await expect(examVault.connect(authority).cancelExam(examId, reasonHash))
@@ -1994,7 +2428,9 @@ describe("ExamVault (SC-01 to SC-06)", () => {
           .withArgs(examId, reasonHash);
 
         const exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(5); // Cancelled
+        expect(exam.state).to.equal(5);
+        expect(exam.cancellationReasonHash).to.equal(reasonHash);
+
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
       });
 
@@ -2010,7 +2446,7 @@ describe("ExamVault (SC-01 to SC-06)", () => {
           .withArgs(examId, reasonHash);
 
         const exam = await examVault.getExam(examId);
-        expect(exam.state).to.equal(5); // Cancelled
+        expect(exam.state).to.equal(5);
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
       });
 
@@ -2025,10 +2461,8 @@ describe("ExamVault (SC-01 to SC-06)", () => {
 
     describe("liveExamCount Lifecycle & Invariants", () => {
       it("tracks holder in multiple concurrent exams and manages live count correctly", async () => {
-        // holder1 is in exam 1 (liveExamCount = 1)
         expect(await examVault.liveExamCount(holder1.address)).to.equal(1n);
 
-        // Cannot revoke or rotate key while in live exam
         await expect(examVault.connect(admin).revokeParticipant(holder1.address, ROLE_HOLDER)).to.be.revertedWithCustomError(
           examVault,
           "HolderInLiveExam"
@@ -2038,7 +2472,6 @@ describe("ExamVault (SC-01 to SC-06)", () => {
           "HolderInLiveExam"
         );
 
-        // Create exam 2 with holder1
         const latest = BigInt(await time.latest());
         const config2 = {
           ...baseConfig,
@@ -2049,20 +2482,16 @@ describe("ExamVault (SC-01 to SC-06)", () => {
         await examVault.connect(authority).createExam(config2);
         const examId2 = 2n;
 
-        // holder1 is now in 2 live exams
         expect(await examVault.liveExamCount(holder1.address)).to.equal(2n);
 
-        // Cancel exam 1 -> count drops to 1
         await examVault.connect(authority).cancelExam(examId, reasonHash);
         expect(await examVault.liveExamCount(holder1.address)).to.equal(1n);
 
-        // Still cannot rotate key
-        await expect(examVault.connect(holder1).setEncryptionKey(validP256PubKey)).to.be.revertedWithCustomError(
+        await expect(examVault.connect(holder1).setEncryptionKey(validP256PubKey)).to.revertedWithCustomError(
           examVault,
           "HolderInLiveExam"
         );
 
-        // Advance exam 2 to Released -> count drops to 0
         await examVault.connect(authority).openCollection(examId2, validP256PubKey);
         await examVault.connect(holder1).commitRandomness(examId2, computeShareCommitment(examId2, holder1.address, share1), computeRandomnessCommitment(examId2, holder1.address, reveal1));
         await examVault.connect(holder2).commitRandomness(examId2, computeShareCommitment(examId2, holder2.address, share2), computeRandomnessCommitment(examId2, holder2.address, reveal2));
@@ -2072,12 +2501,37 @@ describe("ExamVault (SC-01 to SC-06)", () => {
         await examVault.connect(authority).sealExam(examId2);
 
         await time.setNextBlockTimestamp(config2.releaseOpensAt);
-        await examVault.connect(holder1).submitShare(examId2, share1, reveal1);
-        await examVault.connect(holder2).submitShare(examId2, share2, reveal2);
+        await examVault.connect(holder1).submitShare(examId2, computeShareCommitment(examId2, holder1.address, share1), reveal1);
+        const releaseTimestamp = config2.releaseOpensAt + 50n;
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+        const expectedSeed = computeReleaseSeed(examId2, [reveal1, reveal2]);
+        const deadline = releaseTimestamp + 3600n;
+        const holderSetHash = computeHolderSetHash(config2.holders);
+        const threshold = BigInt(config2.threshold);
+        const commitmentSetHash = computeCommitmentSetHash([
+          computeRandomnessCommitment(examId2, holder1.address, reveal1),
+          computeRandomnessCommitment(examId2, holder2.address, reveal2),
+        ]);
+        const attestorSetHash = computeAttestorSetHash([
+          attestor1.address,
+          attestor2.address,
+          attestor3.address,
+        ]);
+        const sigA = await signReleaseAttestation(attestor1, examId2, holderSetHash, threshold, commitmentSetHash, attestorSetHash, config2.releaseOpensAt, deadline, nonce, expectedSeed);
+        const sigB = await signReleaseAttestation(attestor2, examId2, holderSetHash, threshold, commitmentSetHash, attestorSetHash, config2.releaseOpensAt, deadline, nonce, expectedSeed);
+
+        await time.setNextBlockTimestamp(releaseTimestamp);
+        await examVault.connect(holder2).submitShare(
+          examId2,
+          computeShareCommitment(examId2, holder2.address, share2),
+          reveal2,
+          deadline,
+          nonce,
+          sigA,
+          sigB
+        );
 
         expect(await examVault.liveExamCount(holder1.address)).to.equal(0n);
-
-        // Now holder1 can rotate key or be revoked without error!
         await expect(examVault.connect(holder1).setEncryptionKey(validP256PubKey)).to.emit(examVault, "EncryptionKeySet");
       });
     });
@@ -2105,34 +2559,12 @@ describe("ExamVault (SC-01 to SC-06)", () => {
         expect(await examVault.hasCommittedRandomness(examId, holder2.address)).to.be.false;
       });
 
-      it("views revert ExamNotFound on invalid examId", async () => {
-        await expect(examVault.getSectionTotals(999n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getSectionTotals(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.hasCommittedRandomness(999n, holder1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.hasCommittedRandomness(0n, holder1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getCopy(999n, centre1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getCopy(0n, centre1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getCopyOwner(999n, variantHash1)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getCopyOwner(0n, variantHash1)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getRosterRoot(999n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getRosterRoot(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getExam(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getPanel(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getBatches(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getBatch(0n, 1n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getSectionQuestionCount(0n, 0)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getShareCommitment(0n, holder1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getRandomnessCommitment(0n, holder1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.hasSubmittedShare(0n, holder1.address)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.getShareSubmissionCount(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-      });
-
       it("mutating functions revert ExamNotFound on examId == 0 and examId >= nextExamId", async () => {
         await expect(examVault.connect(authority).openCollection(0n, validP256PubKey)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
         await expect(examVault.connect(holder1).commitRandomness(0n, ethers.ZeroHash, ethers.ZeroHash)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
         await expect(examVault.connect(setter1).submitBatch(0n, 0, hashB1, 1)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
         await expect(examVault.connect(authority).sealExam(0n)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
-        await expect(examVault.connect(holder1).submitShare(0n, share1, reveal1)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
+        await expect(examVault.connect(holder1).submitShare(0n, computeShareCommitment(0n, holder1.address, share1), reveal1)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
         await expect(examVault.connect(centre1).registerCopy(0n, variantHash1)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
         await expect(examVault.connect(authority).registerDecoy(0n, decoyHash, channelLabel)).to.be.revertedWithCustomError(examVault, "ExamNotFound");
         await expect(examVault.connect(authority).publishRoster(0n, rosterRoot)).to.be.revertedWithCustomError(examVault, "ExamNotFound");

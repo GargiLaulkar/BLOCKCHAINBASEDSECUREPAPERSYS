@@ -13,6 +13,14 @@ import { SetterAssignmentsContainer } from "./pages/setter/SetterAssignmentsCont
 import { QuestionComposerContainer } from "./pages/setter/QuestionComposerContainer";
 import { HolderAssignmentsContainer } from "./pages/holder/HolderAssignmentsContainer";
 import { HolderConsoleContainer } from "./pages/holder/HolderConsoleContainer";
+import { PublicVerifierPage } from "./pages/public-verifier/PublicVerifierPage";
+import { CentreAssignmentsContainer } from "./pages/centre/CentreAssignmentsContainer";
+import { LeakTracerContainer } from "./pages/auditor/LeakTracerContainer";
+import { DashboardContainer, DashboardLanding } from "./pages/dashboard/DashboardContainer";
+import { AuditLogExplorer } from "./pages/auditor/AuditLogExplorer";
+import { EvidenceReportPage } from "./pages/auditor/EvidenceReportPage";
+import { DecoyManagerPage } from "./pages/auditor/DecoyManagerPage";
+import { RosterProofPage } from "./pages/auditor/RosterProofPage";
 
 type ApiStatus = "checking" | "online" | "offline";
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:4000";
@@ -85,6 +93,9 @@ function HomeView() {
         </div>
         {apiStatus === "offline" && <Button size="sm" variant="secondary" onClick={() => void checkApi()}>Retry</Button>}
       </div>
+      {(roles.includes('AUTHORITY') || roles.includes('CENTRE') || roles.includes('HOLDER') || roles.includes('AUDITOR')) && (
+        <div className="dashboard-home-link"><Link to="/dashboard"><Button variant="primary">Open role dashboard</Button></Link></div>
+      )}
     </section>
   );
 }
@@ -94,11 +105,24 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/dashboard" element={<AppShell requireAuth={true}><DashboardLanding /></AppShell>} />
+          <Route path="/dashboard/authority" element={<AppShell requireAuth={true} requiredRoles={["AUTHORITY"]}><DashboardContainer role="AUTHORITY" /></AppShell>} />
+          <Route path="/dashboard/centre" element={<AppShell requireAuth={true} requiredRoles={["CENTRE"]}><DashboardContainer role="CENTRE" /></AppShell>} />
+          <Route path="/dashboard/holder" element={<AppShell requireAuth={true} requiredRoles={["HOLDER"]}><DashboardContainer role="HOLDER" /></AppShell>} />
+          <Route path="/dashboard/auditor" element={<AppShell requireAuth={true} requiredRoles={["AUDITOR"]}><DashboardContainer role="AUDITOR" /></AppShell>} />
           <Route
             path="/dev/gallery"
             element={
               <AppShell requireAuth={false}>
                 <ComponentGallery />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/verify"
+            element={
+              <AppShell requireAuth={false}>
+                <PublicVerifierPage />
               </AppShell>
             }
           />
@@ -197,6 +221,54 @@ export function App() {
             element={
               <AppShell requireAuth={true} requiredRoles={["HOLDER"]}>
                 <HolderConsoleContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/centre/station"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["CENTRE"]}>
+                <CentreAssignmentsContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/auditor/tracer"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUDITOR"]}>
+                <LeakTracerContainer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/auditor/audit-logs"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUDITOR"]}>
+                <AuditLogExplorer />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/auditor/evidence-report"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUDITOR"]}>
+                <EvidenceReportPage />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/auditor/decoys"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUDITOR", "AUTHORITY"]}>
+                <DecoyManagerPage />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/auditor/roster-proof"
+            element={
+              <AppShell requireAuth={true} requiredRoles={["AUDITOR"]}>
+                <RosterProofPage />
               </AppShell>
             }
           />

@@ -12,7 +12,6 @@ export interface ExamSummary {
   examEndsAt: string;
   threshold: number;
   bankHash: string | null;
-  seed: string | null;
 }
 
 export interface ExamDetail extends ExamSummary {

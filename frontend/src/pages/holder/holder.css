@@ -52,6 +52,7 @@
 .holder-table-scroll {
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   border: 1px solid var(--sigil-color-hairline);
   background: var(--sigil-color-sheet);
 }

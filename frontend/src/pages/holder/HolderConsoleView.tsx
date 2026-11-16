@@ -11,6 +11,7 @@ import {
 } from '@sigil/ui';
 import type { HolderConsoleViewProps, HolderExamAssignment } from './types';
 import { passphraseStrength } from './key-holder';
+import { ATTESTATION_UNAVAILABLE_MESSAGE, PUBLIC_REVEAL_OVERLOAD_BLOCKED_MESSAGE } from './share-submission';
 import './holder.css';
 
 function PageState({
@@ -82,6 +83,8 @@ export function HolderConsoleView({
     ? 0
     : Math.max(0, exam.releaseOpensAt - snapshot.chainTime);
   const countdownTarget = Math.floor(Date.now() / 1000) + remainingUntilOpen;
+  const attestationUnavailable = exam.state === 'Sealed' &&
+    snapshot.submissionCount + 1 >= exam.threshold;
   const submitDisabledReason = actions.isTransactionPending
     ? 'A transaction is in progress.'
     : snapshot.shareSubmitted
@@ -102,7 +105,9 @@ export function HolderConsoleView({
                   ? 'The release window has not opened at chain time.'
                   : snapshot.chainTime > exam.examEndsAt
                     ? 'The release window has closed at chain time.'
-                    : null;
+                    : attestationUnavailable
+                      ? ATTESTATION_UNAVAILABLE_MESSAGE
+                      : 'The deployed contract requires a public Holder reveal. Share submission is disabled until the B2 contract is deployed.';
 
   return (
     <section className="holder-page holder-console" aria-labelledby="holder-console-title">
@@ -260,14 +265,15 @@ export function HolderConsoleView({
         </div>
 
         <aside className="holder-release__action">
+          <p className="holder-console__pending" role="status">{PUBLIC_REVEAL_OVERLOAD_BLOCKED_MESSAGE}</p>
           <Coupon
-            title="Submit share and reveal (permanent)"
-            consequence="The verified share and its reveal become public on-chain. Once enough holders submit, the exam seed is released."
+            title="Holder share submission"
+            consequence="Submission is paused because the deployed contract accepts a public reveal value. No share or reveal transaction will be sent by this interface."
             actionLabel={actions.isSubmittingShare
               ? 'Submitting share'
               : snapshot.shareSubmitted
                 ? 'Share submitted'
-                : 'Submit share and reveal'}
+                : 'Share submission unavailable'}
             onAction={actions.onSubmitShare}
             isReady={!submitDisabledReason && !actions.isSubmittingShare}
             disabledReason={submitDisabledReason ?? undefined}

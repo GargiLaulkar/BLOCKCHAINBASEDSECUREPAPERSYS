@@ -5,10 +5,97 @@ import { prisma } from "../db.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const REDACTED = "[REDACTED]";
+const SENSITIVE_KEY_NAMES = new Set([
+  "seed",
+  "share",
+  "secret",
+  "private",
+  "passphrase",
+  "reveal",
+  "ciphertext",
+  "keymaterial",
+  "key_material",
+  "secretvalue",
+  "secret_value",
+  "privatekey",
+  "private_key",
+  "sharedata",
+  "share_data",
+  "encryptionkey",
+  "encryption_key",
+  "secret_share",
+  "share_value",
+  "secret_key",
+  "private_key_material",
+  "encryption_key_material",
+  "key_material",
+  "private_key_share",
+]);
+
+function normalizeKeyName(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+}
+
+function isSensitiveKey(key: string): boolean {
+  const normalized = normalizeKeyName(key);
+  if (!normalized) return false;
+
+  if (normalized === "encrypted_envelope" || normalized === "encryptedenvelope") {
+    return false;
+  }
+
+  return SENSITIVE_KEY_NAMES.has(normalized);
+}
 
 interface EventCursor {
   blockNumber: bigint;
   logIndex: number;
+}
+
+function sanitizePublicEventPayload(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizePublicEventPayload(item, seen));
+  }
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (seen.has(obj)) return REDACTED;
+    seen.add(obj);
+
+    const safePayload: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(obj)) {
+      if (isSensitiveKey(key)) {
+        safePayload[key] = REDACTED;
+        continue;
+      }
+      safePayload[key] = sanitizePublicEventPayload(nestedValue, seen);
+    }
+    return safePayload;
+  }
+
+  return REDACTED;
+}
+
+function sanitizePublicEventRecord(event: any) {
+  return {
+    id: event.id,
+    blockNumber: event.blockNumber.toString(),
+    logIndex: Number(event.logIndex),
+    txHash: event.txHash,
+    examId: event.examId,
+    type: event.type,
+    actor: event.actor,
+    payloadJson: sanitizePublicEventPayload(event.payloadJson ?? {}),
+    blockTimestamp: event.blockTimestamp.toString(),
+  };
 }
 
 function parseTimestamp(value: string): bigint | null {
@@ -122,10 +209,7 @@ export function createEventsRouter() {
     if (examId !== undefined) where.examId = examId;
     if (type !== undefined) where.type = type;
     if (actor !== undefined) where.actor = actor;
-    if (
-      (from !== undefined && from !== null) ||
-      (to !== undefined && to !== null)
-    ) {
+    if ((from !== undefined && from !== null) || (to !== undefined && to !== null)) {
       where.blockTimestamp = {
         ...(from !== undefined && from !== null ? { gte: from } : {}),
         ...(to !== undefined && to !== null ? { lte: to } : {}),
@@ -146,11 +230,7 @@ export function createEventsRouter() {
       });
       const hasMore = records.length > limit;
       const page = hasMore ? records.slice(0, limit) : records;
-      const events = page.map((event: any) => ({
-        ...event,
-        blockNumber: event.blockNumber.toString(),
-        blockTimestamp: event.blockTimestamp.toString(),
-      }));
+      const events = page.map((event: any) => sanitizePublicEventRecord(event));
       const lastEvent = page.at(-1);
 
       return res.status(200).json(schemas.EventsResponseSchema.parse({

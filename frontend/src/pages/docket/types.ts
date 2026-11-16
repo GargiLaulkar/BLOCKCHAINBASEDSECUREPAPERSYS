@@ -9,7 +9,6 @@ export interface DocketExam {
   examEndsAt: string;
   threshold: number;
   bankHash: string | null;
-  seed: string | null;
   title: string | null;
   holderCount: number;
 }

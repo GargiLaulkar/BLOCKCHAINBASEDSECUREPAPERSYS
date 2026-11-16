@@ -222,4 +222,38 @@ describe("Events and dashboard stats (BE-08)", () => {
     expect((await agent.get("/api/stats/exams/not-a-number/readiness")).status).toBe(400);
     expect((await agent.get("/api/stats/exams/999/readiness")).status).toBe(404);
   });
+
+  it("redacts sensitive values from public event payloads while preserving public metadata", async () => {
+    indexedEvents.splice(0, indexedEvents.length,
+      { id: "secret-1", blockNumber: 20n, logIndex: 0, txHash: `0x${"aa".repeat(32)}`, examId: "7", type: "PaperReleased", actor: authority.address, payloadJson: { examId: "7", seed: "super-secret-seed", releasedAt: 42 }, blockTimestamp: 2000n },
+      { id: "secret-2", blockNumber: 21n, logIndex: 0, txHash: `0x${"bb".repeat(32)}`, examId: "7", type: "ShareSubmitted", actor: holder1.address, payloadJson: { holder: holder1.address, share: "secret-share", nested: { privateKey: "top-secret-key", secretValue: "still-secret" }, publicNote: "visible" }, blockTimestamp: 2001n },
+      { id: "secret-3", blockNumber: 22n, logIndex: 0, txHash: `0x${"cc".repeat(32)}`, examId: "7", type: "EncryptionKeySet", actor: holder2.address, payloadJson: { holder: holder2.address, pubKey: "0xabc", encryptedEnvelope: { encryptionKey: "hidden-key", ok: true } }, blockTimestamp: 2002n },
+      { id: "public-1", blockNumber: 23n, logIndex: 0, txHash: `0x${"dd".repeat(32)}`, examId: "7", type: "MetaUpdated", actor: authority.address, payloadJson: { shareholderCount: 3, sharedAt: 1700000000, shareHolderLabel: "visible" }, blockTimestamp: 2003n },
+    );
+
+    const app = createApp(config, undefined, contract);
+    const response = await request(app).get("/api/events").query({ exam: "7", limit: "10" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.events).toHaveLength(4);
+
+    const releasedEvent = response.body.events.find((event: any) => event.type === "PaperReleased");
+    const shareEvent = response.body.events.find((event: any) => event.type === "ShareSubmitted");
+    const keyEvent = response.body.events.find((event: any) => event.type === "EncryptionKeySet");
+    const publicEvent = response.body.events.find((event: any) => event.type === "MetaUpdated");
+
+    expect(releasedEvent.payloadJson.seed).toBe("[REDACTED]");
+    expect(releasedEvent.payloadJson.releasedAt).toBe(42);
+    expect(shareEvent.payloadJson.share).toBe("[REDACTED]");
+    expect(shareEvent.payloadJson.nested.privateKey).toBe("[REDACTED]");
+    expect(shareEvent.payloadJson.nested.secretValue).toBe("[REDACTED]");
+    expect(shareEvent.payloadJson.publicNote).toBe("visible");
+    expect(keyEvent.payloadJson.encryptedEnvelope.encryptionKey).toBe("[REDACTED]");
+    expect(keyEvent.payloadJson.encryptedEnvelope.ok).toBe(true);
+    expect(publicEvent.payloadJson.shareholderCount).toBe(3);
+    expect(publicEvent.payloadJson.sharedAt).toBe(1700000000);
+    expect(publicEvent.payloadJson.shareHolderLabel).toBe("visible");
+    expect(JSON.stringify(response.body)).not.toContain("super-secret-seed");
+    expect(JSON.stringify(response.body)).not.toContain("secret-share");
+  });
 });

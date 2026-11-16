@@ -38,3 +38,6 @@ Thumbs.db
 *.swo
 
 docs/e2e-screenshots/
+playwright-report/
+test-results/
+blob-report/

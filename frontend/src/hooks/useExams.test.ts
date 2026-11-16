@@ -3,8 +3,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { useExamPanel, useExams } from "./useExams";
 
 const examList = [
-  { examId: "7", chainId: 31337, state: 1, metaHash: "0x" + "11".repeat(32), releaseOpensAt: "100", examStartsAt: "200", examEndsAt: "300", threshold: 2, bankHash: null, seed: null },
-  { examId: "8", chainId: 31337, state: 2, metaHash: "0x" + "22".repeat(32), releaseOpensAt: "400", examStartsAt: "500", examEndsAt: "600", threshold: 3, bankHash: null, seed: null },
+  { examId: "7", chainId: 31337, state: 1, metaHash: "0x" + "11".repeat(32), releaseOpensAt: "100", examStartsAt: "200", examEndsAt: "300", threshold: 2, bankHash: null },
+  { examId: "8", chainId: 31337, state: 2, metaHash: "0x" + "22".repeat(32), releaseOpensAt: "400", examStartsAt: "500", examEndsAt: "600", threshold: 3, bankHash: null },
 ] as const;
 
 describe("useExams", () => {

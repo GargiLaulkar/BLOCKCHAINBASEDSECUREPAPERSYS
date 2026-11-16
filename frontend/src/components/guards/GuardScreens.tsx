@@ -16,7 +16,7 @@ export const ConnectWalletGuard: React.FC<ConnectWalletGuardProps> = ({
     <div className="sigil-guard-screen" data-testid="guard-connect-wallet">
       <div className="sigil-guard-card">
         <span className="sigil-guard-mark">S</span>
-        <h2 className="sigil-guard-title">Connect your wallet</h2>
+        <h1 className="sigil-guard-title">Connect your wallet</h1>
         <p className="sigil-guard-desc">
           Connect an authorized Web3 wallet (such as MetaMask) to authenticate against the SIGIL examination custody ledger.
         </p>
@@ -25,10 +25,12 @@ export const ConnectWalletGuard: React.FC<ConnectWalletGuardProps> = ({
           size="lg"
           onClick={onConnect}
           disabled={isConnecting}
+          aria-busy={isConnecting || undefined}
         >
           {isConnecting ? 'Connecting wallet...' : 'Connect MetaMask wallet'}
         </Button>
-        {error && <div className="sigil-guard-error">{error}</div>}
+        {isConnecting && <p role="status">Connecting wallet…</p>}
+        {error && <div className="sigil-guard-error" role="alert">{error}</div>}
       </div>
     </div>
   );
@@ -51,7 +53,7 @@ export const SignInGuard: React.FC<SignInGuardProps> = ({
     <div className="sigil-guard-screen" data-testid="guard-sign-in">
       <div className="sigil-guard-card">
         <span className="sigil-guard-mark">SIWE</span>
-        <h2 className="sigil-guard-title">Sign in with Ethereum</h2>
+        <h1 className="sigil-guard-title">Sign in with Ethereum</h1>
         <p className="sigil-guard-desc">
           Prove control of your address by signing an EIP-4361 cryptographic message. This establishes an authenticated custody session.
         </p>
@@ -66,10 +68,12 @@ export const SignInGuard: React.FC<SignInGuardProps> = ({
           size="lg"
           onClick={onSignIn}
           disabled={isLoggingIn}
+          aria-busy={isLoggingIn || undefined}
         >
           {isLoggingIn ? 'Awaiting signature...' : 'Sign-In With Ethereum'}
         </Button>
-        {error && <div className="sigil-guard-error">{error}</div>}
+        {isLoggingIn && <p role="status">Waiting for wallet signature…</p>}
+        {error && <div className="sigil-guard-error" role="alert">{error}</div>}
       </div>
     </div>
   );
@@ -88,9 +92,9 @@ export const WrongNetworkGuard: React.FC<WrongNetworkGuardProps> = ({
     <div className="sigil-guard-screen" data-testid="guard-wrong-network">
       <div className="sigil-guard-card sigil-guard-card--alert">
         <span className="sigil-guard-mark sigil-guard-mark--alert">!</span>
-        <h2 className="sigil-guard-title" style={{ color: 'var(--sigil-color-alert)' }}>
+        <h1 className="sigil-guard-title" style={{ color: 'var(--sigil-color-alert)' }}>
           Wrong network detected
-        </h2>
+        </h1>
         <p className="sigil-guard-desc">
           Your wallet is currently connected to an unsupported chain ({currentChainId || 'unknown'}). SIGIL requires the local development network (Chain ID: 31337).
         </p>
@@ -115,7 +119,7 @@ export const NoRoleGuard: React.FC<NoRoleGuardProps> = ({
     <div className="sigil-guard-screen" data-testid="guard-no-role">
       <div className="sigil-guard-card">
         <span className="sigil-guard-mark">∅</span>
-        <h2 className="sigil-guard-title">No authorized role assigned</h2>
+        <h1 className="sigil-guard-title">No authorized role assigned</h1>
         <p className="sigil-guard-desc">
           Your wallet is authenticated, but this address holds no active permissions in the ExamVault smart contract participant registry.
         </p>

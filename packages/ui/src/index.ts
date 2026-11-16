@@ -13,6 +13,7 @@ export * from './components/Tabs';
 export * from './components/Toast';
 export * from './components/Tooltip';
 export * from './components/EmptyState';
+export * from './components/AsyncState';
 
 // Signature components (FA-03)
 export * from './components/CustodyBubbles';

@@ -30,7 +30,6 @@ const mocks = vi.hoisted(() => ({
     examEndsAt: '1800010800',
     threshold: 2,
     bankHash: null,
-    seed: null,
   }],
   holders: [
     '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',

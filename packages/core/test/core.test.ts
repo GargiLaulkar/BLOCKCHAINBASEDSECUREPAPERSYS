@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keccak256, toUtf8Bytes } from "ethers";
+import { concat, getBytes, keccak256, toUtf8Bytes } from "ethers";
 import * as core from "../src/index.js";
 
 const pub = new Uint8Array([4, ...new Uint8Array(64)]);
@@ -45,6 +45,36 @@ describe("CR-03 envelope", () => {
     await expect(core.envelope.decryptEnvelope(jwk, envelope, "SIGIL/v1:8:batch:0")).rejects.toThrow();
     const tampered = envelope.slice(); tampered[tampered.length - 1] ^= 1;
     await expect(core.envelope.decryptEnvelope(jwk, tampered, "SIGIL/v1:7:batch:0")).rejects.toThrow();
+  });
+});
+
+describe("Question bank integrity", () => {
+  it("matches the contract packed hash formula in submitted batch order", async () => {
+    const first = new TextEncoder().encode("ciphertext one");
+    const second = new TextEncoder().encode("ciphertext two");
+    const firstHash = keccak256(first);
+    const secondHash = keccak256(second);
+    const bankHash = keccak256(concat([getBytes(firstHash), getBytes(secondHash)]));
+
+    expect(() => core.batch.verifyBatchBankIntegrity([
+      { envelope: first, ciphertextHash: firstHash as `0x${string}` },
+      { envelope: second, ciphertextHash: secondHash as `0x${string}` },
+    ], bankHash as `0x${string}`)).not.toThrow();
+    expect(() => core.batch.verifyBatchBankIntegrity([
+      { envelope: second, ciphertextHash: secondHash as `0x${string}` },
+      { envelope: first, ciphertextHash: firstHash as `0x${string}` },
+    ], bankHash as `0x${string}`)).toThrow("Question bank integrity check failed");
+  });
+
+  it("rejects ciphertext and aggregate hash mismatches", () => {
+    const envelope = new TextEncoder().encode("encrypted batch");
+    const validHash = keccak256(envelope) as `0x${string}`;
+    expect(() => core.batch.verifyBatchBankIntegrity([
+      { envelope, ciphertextHash: `0x${"11".repeat(32)}` },
+    ], `0x${"22".repeat(32)}`)).toThrow("Question batch ciphertext integrity check failed");
+    expect(() => core.batch.verifyBatchBankIntegrity([
+      { envelope, ciphertextHash: validHash },
+    ], `0x${"22".repeat(32)}`)).toThrow("Question bank integrity check failed");
   });
 });
 

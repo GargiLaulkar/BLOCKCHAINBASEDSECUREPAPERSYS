@@ -19,7 +19,12 @@
     "coverage:check": "pnpm --filter @sigil/contracts coverage:check",
     "docs:contract": "pnpm --filter @sigil/contracts docs:contract",
     "test:contracts": "pnpm --filter @sigil/contracts test",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "coverage:contracts": "pnpm --filter @sigil/contracts coverage",
     "lint:contracts": "pnpm --filter @sigil/contracts lint"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
   }
 }

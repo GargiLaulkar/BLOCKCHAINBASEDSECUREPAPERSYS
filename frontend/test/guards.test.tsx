@@ -47,6 +47,13 @@ describe('FA-04: Guard Screens & Auth Guard Tests', () => {
     expect(handleSignIn).toHaveBeenCalledTimes(1);
   });
 
+  it('uses a single alert announcement and level-one headings for guard screens', () => {
+    render(<ConnectWalletGuard onConnect={vi.fn()} error="Wallet connection failed." />);
+    const alert = screen.getByRole('alert');
+    expect(alert.getAttribute('aria-live')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Connect your wallet' })).toBeDefined();
+  });
+
   it('renders WrongNetworkGuard with alert border and switch action', () => {
     const handleSwitch = vi.fn();
     render(<WrongNetworkGuard currentChainId="0x1" onSwitchNetwork={handleSwitch} />);

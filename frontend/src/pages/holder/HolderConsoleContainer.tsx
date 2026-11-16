@@ -13,6 +13,11 @@ import { decodeContractError } from '../../utils/errors';
 import { examStateFromChain, selectRosetteHash } from '../command-centre/logic';
 import { fetchExamMetadata, fetchMyEncryptedShare } from './api';
 import { holderContractMessage, passphraseErrorMessage } from './key-holder';
+import {
+  ATTESTATION_UNAVAILABLE_MESSAGE,
+  PUBLIC_REVEAL_OVERLOAD_BLOCKED_MESSAGE,
+  submitHolderShareCommitment,
+} from './share-submission';
 import { HolderConsoleView } from './HolderConsoleView';
 import type { HolderConsoleSnapshot, HolderExamAssignment } from './types';
 
@@ -304,6 +309,7 @@ export function HolderConsoleContainer() {
   const executeTransaction = useCallback(async (
     title: string,
     operation: () => Promise<ethers.TransactionResponse>,
+    safeFailureMessage?: string,
   ): Promise<string> => {
     activeTransactionHash.current = null;
     setActionError(null);
@@ -323,7 +329,7 @@ export function HolderConsoleContainer() {
       return response.hash;
     } catch (thrownError) {
       const decoded = decodeContractError(thrownError);
-      const message = holderContractMessage(decoded.name) ?? decoded.formatted;
+      const message = safeFailureMessage ?? holderContractMessage(decoded.name) ?? decoded.formatted;
       setActionError(message);
       if (activeTransactionHash.current) {
         tx.setTxFailed(message);
@@ -571,17 +577,47 @@ export function HolderConsoleContainer() {
 
   const submitShare = useCallback(async () => {
     const material = secretMaterialRef.current;
-    if (!rawContract || !snapshot.exam || !material) {
+    if (!rawContract || !snapshot.exam || !material || !guard.account) {
       setActionError('Unlock and verify the encrypted share before submitting.');
       return;
     }
     setIsSubmittingShare(true);
     setActionError(null);
     try {
-      const reveal = await deriveReveal(material.key, BigInt(examId));
-      await executeTransaction('Submit share and reveal', () =>
-        rawContract.getFunction('submitShare')(BigInt(examId), material.share, reveal),
-      );
+      const result = await submitHolderShareCommitment({
+        examId: BigInt(examId),
+        holder: ethers.getAddress(guard.account) as Address,
+        share: material.share,
+        expectedCommitment: material.shareCommitment,
+        readOnChainCommitment: async () => String(
+          await rawContract.getFunction('getShareCommitment')(BigInt(examId), guard.account),
+        ),
+        readReleaseState: async () => {
+          const currentExam = await rawContract.getFunction('getExam')(BigInt(examId));
+          return {
+            state: Number(currentExam.state ?? currentExam[1]),
+            threshold: Number(currentExam.threshold ?? currentExam[7]),
+          };
+        },
+        readSubmissionCount: async () => BigInt(
+          await rawContract.getFunction('getShareSubmissionCount')(BigInt(examId)),
+        ),
+        readHasSubmitted: async () => Boolean(
+          await rawContract.getFunction('hasSubmittedShare')(BigInt(examId), guard.account),
+        ),
+      });
+      if (result === 'attestation-required') {
+        resetSecrets();
+        setActionMessage(null);
+        setActionError(ATTESTATION_UNAVAILABLE_MESSAGE);
+        return;
+      }
+      if (result === 'contract-upgrade-required') {
+        resetSecrets();
+        setActionMessage(null);
+        setActionError(PUBLIC_REVEAL_OVERLOAD_BLOCKED_MESSAGE);
+        return;
+      }
       clearSecrets();
       setSnapshot((current) => ({
         ...current,
@@ -590,16 +626,17 @@ export function HolderConsoleContainer() {
         shareSubmitted: true,
         submissionCount: current.submissionCount + 1,
       }));
-      setActionMessage('Share and reveal confirmed on-chain. In-memory share and key references were cleared.');
+      setActionMessage('Share submission confirmed. In-memory share and key references were cleared.');
     } catch (thrownError) {
-      const message = thrownError instanceof Error ? thrownError.message : 'Share submission failed.';
       resetSecrets();
       setActionMessage(null);
-      setActionError(message);
+      setActionError(thrownError instanceof Error && thrownError.message === ATTESTATION_UNAVAILABLE_MESSAGE
+        ? ATTESTATION_UNAVAILABLE_MESSAGE
+        : 'Share commitment submission failed. No plaintext share was submitted.');
     } finally {
       setIsSubmittingShare(false);
     }
-  }, [examId, executeTransaction, rawContract, resetSecrets, snapshot.exam]);
+  }, [examId, guard.account, rawContract, resetSecrets, snapshot.exam]);
 
   const pageState = !guard.isAuthorized
     ? guard.guardState === 'no-role' ? 'permission' : 'loading'

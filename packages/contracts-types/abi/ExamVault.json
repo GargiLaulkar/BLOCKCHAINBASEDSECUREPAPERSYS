@@ -37,6 +37,17 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      }
+    ],
+    "name": "AttestorNotAuthorized",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "BatchNotFound",
     "type": "error"
@@ -58,12 +69,55 @@
   },
   {
     "inputs": [],
+    "name": "ECDSAInvalidSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "length",
+        "type": "uint256"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "s",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureS",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ExamNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "deadline",
+        "type": "uint64"
+      }
+    ],
+    "name": "ExpiredAttestation",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "HolderInLiveExam",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidAttestation",
     "type": "error"
   },
   {
@@ -530,12 +584,6 @@
       },
       {
         "indexed": false,
-        "internalType": "bytes32",
-        "name": "seed",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
         "internalType": "uint64",
         "name": "releasedAt",
         "type": "uint64"
@@ -605,6 +653,19 @@
       }
     ],
     "name": "RandomnessCommitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address[3]",
+        "name": "attestors",
+        "type": "address[3]"
+      }
+    ],
+    "name": "ReleaseAttestorsSet",
     "type": "event"
   },
   {
@@ -718,9 +779,9 @@
       },
       {
         "indexed": false,
-        "internalType": "bytes",
-        "name": "share",
-        "type": "bytes"
+        "internalType": "bytes32",
+        "name": "shareCommitment",
+        "type": "bytes32"
       }
     ],
     "name": "ShareSubmitted",
@@ -780,7 +841,33 @@
   },
   {
     "inputs": [],
+    "name": "EIP712_DOMAIN_TYPEHASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "HOLDER_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "RELEASE_ATTESTATION_TYPEHASH",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -1176,11 +1263,6 @@
             "type": "bytes32"
           },
           {
-            "internalType": "bytes32",
-            "name": "seed",
-            "type": "bytes32"
-          },
-          {
             "internalType": "bytes",
             "name": "examPublicKey",
             "type": "bytes"
@@ -1532,6 +1614,25 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "isReleaseAttestor",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
@@ -1699,6 +1800,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "releaseAttestors",
+    "outputs": [
+      {
+        "internalType": "address[3]",
+        "name": "",
+        "type": "address[3]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -1809,6 +1923,19 @@
   {
     "inputs": [
       {
+        "internalType": "address[3]",
+        "name": "attestors",
+        "type": "address[3]"
+      }
+    ],
+    "name": "setReleaseAttestors",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "examId",
         "type": "uint256"
@@ -1848,14 +1975,57 @@
         "type": "uint256"
       },
       {
-        "internalType": "bytes",
-        "name": "share",
-        "type": "bytes"
+        "internalType": "bytes32",
+        "name": "shareCommitment",
+        "type": "bytes32"
       },
       {
         "internalType": "bytes32",
         "name": "reveal",
         "type": "bytes32"
+      }
+    ],
+    "name": "submitShare",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "examId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "shareCommitment",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "reveal",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint64",
+        "name": "deadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "signatureA",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "signatureB",
+        "type": "bytes"
       }
     ],
     "name": "submitShare",

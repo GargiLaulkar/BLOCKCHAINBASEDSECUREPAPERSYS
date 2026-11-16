@@ -182,11 +182,11 @@ describe('FA-10 holder page states and controls', () => {
     expect(onGenerateKeystore).toHaveBeenCalledOnce();
   });
 
-  it('shows specific blocked release reasons and only enables after all gates pass', () => {
+  it('shows specific release blockers and never enables the reveal-bearing submission path', () => {
     const baseActions = createActions({ hasKeystoreFile: true });
     const { rerender } = renderConsole({ actions: baseActions });
     expect(screen.getByText('Register this holder wallet’s encryption key first.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Submit share and reveal' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Share submission unavailable' })).toBeDisabled();
 
     rerender(
       <HolderConsoleView
@@ -272,7 +272,8 @@ describe('FA-10 holder page states and controls', () => {
         actions={baseActions}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Submit share and reveal' })).toBeEnabled();
+    expect(screen.getByText(/deployed contract requires a public Holder reveal/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Share submission unavailable' })).toBeDisabled();
   });
 
   it('keeps secrets out of rendered content after controlled passphrase state is cleared', () => {

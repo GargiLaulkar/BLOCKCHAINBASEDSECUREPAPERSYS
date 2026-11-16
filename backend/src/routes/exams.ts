@@ -10,6 +10,7 @@ import { ExamVaultABI } from "@sigil/contracts-types";
 import { canonical, schemas } from "@sigil/core";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { prisma } from "../db.js";
+import { logger } from "../logger.js";
 import type { Config } from "../config.js";
 
 const MAX_BATCH_BYTES = 5 * 1024 * 1024;
@@ -511,7 +512,7 @@ export function createExamsRouter(
 
       if (!isAuthenticated) {
         // Public summary variant: exposes no secrets (Section 4.3 public data only)
-        const publicExams = exams.map((e) => ({
+        const publicExams = exams.map((e: (typeof exams)[number]) => ({
           examId: e.examId,
           chainId: e.chainId,
           state: e.state,
@@ -521,7 +522,6 @@ export function createExamsRouter(
           examEndsAt: e.examEndsAt.toString(),
           threshold: e.threshold,
           bankHash: e.bankHash,
-          seed: e.seed,
         }));
         return res.status(200).json(publicExams);
       }
@@ -537,11 +537,20 @@ export function createExamsRouter(
         }
       }
 
-      const mapped = filtered.map((e) => ({
-        ...e,
+      const mapped = filtered.map((e: (typeof filtered)[number]) => ({
+        id: e.id,
+        examId: e.examId,
+        chainId: e.chainId,
+        metaHash: e.metaHash,
+        metaJson: e.metaJson,
+        state: e.state,
         releaseOpensAt: e.releaseOpensAt.toString(),
         examStartsAt: e.examStartsAt.toString(),
         examEndsAt: e.examEndsAt.toString(),
+        threshold: e.threshold,
+        bankHash: e.bankHash,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
       }));
 
       return res.status(200).json(mapped);
@@ -554,6 +563,67 @@ export function createExamsRouter(
       });
     }
   });
+
+  // A Centre request is validated here, but paper generation remains blocked until
+  // the protected reconstruction/attestation and managed print services exist.
+  router.post(
+    "/:id/centre-paper/request",
+    requireAuth,
+    requireRole("CENTRE"),
+    async (req: Request, res: Response) => {
+      const parsed = z.object({
+        intent: z.enum(["generate", "reprint"]),
+        reason: z.string().trim().min(10).max(500).optional(),
+      }).safeParse(req.body);
+      if (!parsed.success || (parsed.data.intent === "reprint" && !parsed.data.reason)) {
+        return res.status(400).json({
+          error: { code: "INVALID_REQUEST", message: "A valid generation or reprint request is required." },
+        });
+      }
+
+      const examId = req.params.id;
+      const centre = ethers.getAddress(req.session!.address!);
+      const intent = parsed.data.intent;
+      try {
+        const contract = getContract();
+        const exam = await contract.getExam(BigInt(examId));
+        const [, , centres] = await contract.getPanel(BigInt(examId));
+        const role = await contract.hasRole(ethers.id("CENTRE_ROLE"), centre);
+        const assigned = role && centres.some((address: string) => ethers.getAddress(address) === centre);
+        if (!assigned) {
+          logger.info({ event: "centre_paper_request", examId, centre, intent, outcome: "denied" });
+          return res.status(403).json({
+            error: { code: "CENTRE_NOT_ASSIGNED", message: "This Centre is not assigned to the examination." },
+          });
+        }
+
+        if (Number(exam.state) !== 3) {
+          return res.status(409).json({
+            error: { code: "EXAM_NOT_RELEASED", message: "Paper access is unavailable until the exam is released." },
+          });
+        }
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        if (now < BigInt(exam.releaseOpensAt) || now > BigInt(exam.examEndsAt)) {
+          return res.status(423).json({
+            error: { code: "PRINT_WINDOW_CLOSED", message: "The Centre paper window is not open." },
+          });
+        }
+
+        // Do not generate or return an artifact without real B2 authorization.
+        logger.info({ event: "centre_paper_request", examId, centre, intent, outcome: "blocked_unconfigured" });
+        return res.status(503).json({
+          error: {
+            code: "PROTECTED_PRINT_SERVICE_UNAVAILABLE",
+            message: "Paper generation is unavailable until the protected release, attestation, and managed print services are configured.",
+          },
+        });
+      } catch {
+        return res.status(503).json({
+          error: { code: "EXAM_VALIDATION_UNAVAILABLE", message: "Centre assignment could not be verified. Retry later." },
+        });
+      }
+    },
+  );
 
   // GET /api/exams/:id/shares/me - return assigned holder's own envelope
   router.get(
@@ -573,10 +643,10 @@ export function createExamsRouter(
           panelHolders = holders.map((h: string) => ethers.getAddress(h));
         } catch {
           // Fallback to database PanelMember if on-chain call fails
-          const dbHolders = await prisma.panelMember.findMany({
+          const dbHolders: Array<{ address: string }> = await prisma.panelMember.findMany({
             where: { examId: id, kind: "holder" },
           });
-          panelHolders = dbHolders.map((m) => ethers.getAddress(m.address));
+          panelHolders = dbHolders.map((m: { address: string }) => ethers.getAddress(m.address));
         }
 
         if (!panelHolders.includes(caller)) {
@@ -675,10 +745,10 @@ export function createExamsRouter(
           const [holders] = await contract.getPanel(BigInt(id));
           panelHolders = holders.map((h: string) => ethers.getAddress(h));
         } catch {
-          const dbHolders = await prisma.panelMember.findMany({
+          const dbHolders: Array<{ address: string }> = await prisma.panelMember.findMany({
             where: { examId: id, kind: "holder" },
           });
-          panelHolders = dbHolders.map((m) => ethers.getAddress(m.address));
+          panelHolders = dbHolders.map((m: { address: string }) => ethers.getAddress(m.address));
         }
 
         // 5. Parse and validate shares payload
@@ -882,7 +952,6 @@ export function createExamsRouter(
                 examEndsAt: BigInt(onChainExam.examEndsAt),
                 threshold: Number(onChainExam.threshold),
                 bankHash: onChainExam.bankHash !== ethers.ZeroHash ? onChainExam.bankHash : null,
-                seed: onChainExam.seed !== ethers.ZeroHash ? onChainExam.seed : null,
               },
             });
           }
@@ -911,7 +980,6 @@ export function createExamsRouter(
           examEndsAt: exam.examEndsAt.toString(),
           threshold: exam.threshold,
           bankHash: exam.bankHash,
-          seed: exam.seed,
         });
       }
 
@@ -928,10 +996,19 @@ export function createExamsRouter(
       }
 
       return res.status(200).json({
-        ...exam,
+        id: exam.id,
+        examId: exam.examId,
+        chainId: exam.chainId,
+        metaHash: exam.metaHash,
+        metaJson: exam.metaJson,
+        state: exam.state,
         releaseOpensAt: exam.releaseOpensAt.toString(),
         examStartsAt: exam.examStartsAt.toString(),
         examEndsAt: exam.examEndsAt.toString(),
+        threshold: exam.threshold,
+        bankHash: exam.bankHash,
+        createdAt: exam.createdAt,
+        updatedAt: exam.updatedAt,
       });
     } catch (err: any) {
       return res.status(500).json({
@@ -1022,7 +1099,6 @@ export function createExamsRouter(
             threshold: Number(onChainExam.threshold),
             bankHash:
               onChainExam.bankHash !== ethers.ZeroHash ? onChainExam.bankHash : null,
-            seed: onChainExam.seed !== ethers.ZeroHash ? onChainExam.seed : null,
           },
           update: {
             metaHash: onChainExam.metaHash,

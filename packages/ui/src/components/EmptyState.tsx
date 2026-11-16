@@ -14,8 +14,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`sigil-empty-state ${className}`.trim()}>
-      <div className="sigil-empty-state__title">{title}</div>
+    <div className={`sigil-empty-state ${className}`.trim()} aria-live="polite" aria-atomic="true">
+      <div className="sigil-empty-state__title" role="heading" aria-level={2}>{title}</div>
       <p className="sigil-empty-state__description">{description}</p>
       {action && <div>{action}</div>}
     </div>

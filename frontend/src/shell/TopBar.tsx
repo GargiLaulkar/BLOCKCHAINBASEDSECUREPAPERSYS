@@ -37,6 +37,7 @@ export const TopBar: React.FC = () => {
       links.push({ label: 'Create exam', to: '/authority/create' });
       links.push({ label: 'Key ceremony', to: '/authority/ceremony' });
       links.push({ label: 'Audit log', to: '/audit' });
+      links.push({ label: 'Decoy manager', to: '/auditor/decoys' });
     }
 
     if (roles.includes('SETTER')) {
@@ -53,7 +54,14 @@ export const TopBar: React.FC = () => {
 
     if (roles.includes('AUDITOR')) {
       links.push({ label: 'Leak tracer', to: '/auditor/tracer' });
-      links.push({ label: 'Audit log', to: '/audit' });
+      links.push({ label: 'Audit log explorer', to: '/auditor/audit-logs' });
+      links.push({ label: 'Evidence PDF reports', to: '/auditor/evidence-report' });
+      links.push({ label: 'Decoy monitor', to: '/auditor/decoys' });
+      links.push({ label: 'Roster proof', to: '/auditor/roster-proof' });
+    }
+
+    if (roles.some((role) => ['AUTHORITY', 'CENTRE', 'HOLDER', 'AUDITOR'].includes(role))) {
+      links.push({ label: 'Dashboard', to: '/dashboard' });
     }
 
     // Always provide link to the Component gallery

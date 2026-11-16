@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
     submissionCount: 1,
     blockTimestamp: 1_800_000_000,
     submitError: null as { name: string; message: string } | null,
-    submittedShare: null as Uint8Array | null,
+    submittedShare: null as string | null,
   };
   const txResponse = {
     hash: `0x${'b'.repeat(64)}`,
@@ -38,7 +38,6 @@ const mocks = vi.hoisted(() => {
       examEndsAt: '1800001000',
       threshold: 3,
       bankHash: null,
-      seed: null,
     }],
     isLoading: false,
     error: null,
@@ -166,6 +165,9 @@ function renderRoute() {
 }
 
 function configureContractMethods() {
+  mocks.methods.getExam = vi.fn(async () => ({ state: 2, threshold: 3 }));
+  mocks.methods.getShareSubmissionCount = vi.fn(async () => BigInt(mocks.chain.submissionCount));
+  mocks.methods.hasSubmittedShare = vi.fn(async () => mocks.chain.shareSubmitted);
   mocks.methods.encryptionKeys = vi.fn(async () => mocks.chain.encryptionKey);
   mocks.methods.getShareCommitment = vi.fn(async () => mocks.chain.shareCommitment);
   mocks.methods.hasCommittedRandomness = vi.fn(async () => mocks.chain.randomnessCommitted);
@@ -184,13 +186,14 @@ function configureContractMethods() {
     mocks.chain.randomnessCommitted = true;
     return mocks.txResponse;
   });
-  mocks.methods.submitShare = vi.fn(async (_examId: bigint, share: Uint8Array) => {
+  mocks.methods.submitShare = vi.fn(async (_examId: bigint, commitment: string) => {
     if (mocks.chain.submitError) throw mocks.chain.submitError;
-    mocks.chain.submittedShare = share.slice();
+    mocks.chain.submittedShare = commitment;
     mocks.chain.shareSubmitted = true;
     mocks.chain.submissionCount += 1;
     return mocks.txResponse;
   });
+  mocks.methods['submitShare(uint256,bytes32,bytes32)'] = mocks.methods.submitShare;
 }
 
 let apiFetch: ReturnType<typeof vi.fn>;
@@ -218,7 +221,6 @@ beforeEach(() => {
     examEndsAt: '1800001000',
     threshold: 3,
     bankHash: null,
-    seed: null,
   }];
   mocks.panel.holders = [
     mocks.account,
@@ -328,21 +330,13 @@ describe('FA-10 holder container workflows', () => {
 
     mocks.exams.exams = [{ ...mocks.exams.exams[0]!, state: 2 }];
     rerender(createRoute());
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit share and reveal' })).toBeEnabled());
-    const expectedShare = mocks.crypto.decryptedShare.slice();
-    fireEvent.click(screen.getByRole('button', { name: 'Submit share and reveal' }));
-    await screen.findByText(/In-memory share and key references were cleared/);
-    expect(mocks.methods.submitShare).toHaveBeenCalledWith(
-      7n,
-      mocks.crypto.decryptedShare,
-      mocks.crypto.reveal,
-    );
-    expect(mocks.chain.submittedShare).toEqual(expectedShare);
-    expect(mocks.crypto.decryptedShare.every((byte) => byte === 0)).toBe(true);
-    expect(mocks.crypto.lastHolderKey?.privateKeyJwk.d).toBeUndefined();
+    const submitButton = await screen.findByRole('button', { name: 'Share submission unavailable' });
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByText(/deployed contract still requires a public Holder reveal/i)).toBeInTheDocument();
+    expect(mocks.methods.submitShare).not.toHaveBeenCalled();
+    expect(mocks.chain.submittedShare).toBeNull();
     expect(document.body.innerHTML).not.toContain('TEST_PRIVATE_KEY');
     expect(document.body.innerHTML).not.toContain('TEST_PLAINTEXT_SHARE');
-    expect(document.body.innerHTML).not.toContain('test-only-release-passphrase');
     expect(localSet).not.toHaveBeenCalled();
     expect(sessionSet).not.toHaveBeenCalled();
     expect(apiFetch.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
@@ -387,32 +381,4 @@ describe('FA-10 holder container workflows', () => {
     expect(holderContractMessage(name)).toBe(expected);
   });
 
-  it.each([
-    ['TooEarly', 'The release window has not opened at chain time (TooEarly).'],
-    ['InvalidShare', 'The submitted share was rejected by the contract (InvalidShare).'],
-    ['AlreadySubmitted', 'This holder has already submitted a share for this exam (AlreadySubmitted).'],
-    ['TooLate', 'The release window has closed at chain time (TooLate).'],
-    ['NotAssigned', 'This wallet is not assigned as a holder for this exam (NotAssigned).'],
-  ])('decodes an on-chain %s rejection into a retryable message', async (name, expected) => {
-    mocks.chain.encryptionKey = mocks.crypto.pubKey.slice();
-    mocks.chain.shareCommitment = mocks.crypto.shareCommitment;
-    mocks.chain.randomnessCommitted = true;
-    mocks.chain.submitError = { name, message: 'mock contract rejection' };
-    mocks.exams.exams = [{ ...mocks.exams.exams[0]!, state: 2 }];
-    mocks.crypto.decryptedShare = new TextEncoder().encode('TEST_PLAINTEXT_SHARE');
-    renderRoute();
-    await screen.findByRole('heading', { name: 'Regional Physics Examination' });
-    await selectAndUnlockShare();
-    await screen.findByText('The decrypted share matches the current on-chain commitment.');
-    fireEvent.click(screen.getByRole('button', { name: 'Submit share and reveal' }));
-    await screen.findByText(expected);
-    expect(mocks.methods.submitShare).toHaveBeenCalledOnce();
-    expect(mocks.tx.setActiveTx).toHaveBeenCalledWith({
-      status: 'failed',
-      title: 'Submit share and reveal',
-      errorMessage: expected,
-    });
-    expect(document.body.innerHTML).not.toContain('TEST_PRIVATE_KEY');
-    expect(document.body.innerHTML).not.toContain('TEST_PLAINTEXT_SHARE');
-  });
 });

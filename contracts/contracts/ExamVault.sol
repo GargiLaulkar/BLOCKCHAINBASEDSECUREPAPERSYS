@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title ExamVault
@@ -16,6 +18,13 @@ contract ExamVault is AccessControl {
     bytes32 public constant HOLDER_ROLE = keccak256("HOLDER_ROLE");
     bytes32 public constant CENTRE_ROLE = keccak256("CENTRE_ROLE");
     bytes32 public constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+
+    bytes32 public constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 public constant RELEASE_ATTESTATION_TYPEHASH =
+        keccak256(
+            "ReleaseAttestation(uint256 examId,uint256 chainId,address contractAddress,bytes32 holderSetHash,uint8 threshold,bytes32 commitmentSetHash,bytes32 attestorSetHash,uint64 releaseValidFrom,uint64 deadline,bytes32 nonce,bytes32 seed)"
+        );
 
     // --- State Machine ---
     enum State {
@@ -51,7 +60,6 @@ contract ExamVault is AccessControl {
         uint8 threshold;
         uint8 holderCount;
         bytes32 bankHash;
-        bytes32 seed;
         bytes examPublicKey;
         uint16[] quotas;
         uint64 releasedAt;
@@ -81,6 +89,8 @@ contract ExamVault is AccessControl {
     error InvalidKeyFormat();
     error InvalidShare();
     error InvalidReveal();
+    error InvalidAttestation();
+    error ExpiredAttestation(uint64 deadline);
     error AlreadySubmitted();
     error QuotaNotMet(uint8 sectionId, uint16 have, uint16 need);
     error MissingCommitment(address holder);
@@ -94,6 +104,7 @@ contract ExamVault is AccessControl {
     error InvalidQuotas();
     error BatchNotFound();
     error CopyMismatch();
+    error AttestorNotAuthorized(address signer);
 
     // --- Events (Spec Section 7.3) ---
     event ParticipantRegistered(address indexed account, uint8 indexed role, bytes32 profileHash);
@@ -127,8 +138,8 @@ contract ExamVault is AccessControl {
         uint16 startInSection
     );
     event ExamSealed(uint256 indexed examId, bytes32 bankHash);
-    event ShareSubmitted(uint256 indexed examId, address indexed holder, bytes share);
-    event PaperReleased(uint256 indexed examId, bytes32 seed, uint64 releasedAt);
+    event ShareSubmitted(uint256 indexed examId, address indexed holder, bytes32 shareCommitment);
+    event PaperReleased(uint256 indexed examId, uint64 releasedAt);
     event CopyRegistered(uint256 indexed examId, address indexed centre, bytes32 variantHash, uint64 registeredAt);
     event DecoyRegistered(uint256 indexed examId, bytes32 decoyHash, bytes32 channelLabel);
     event RosterPublished(uint256 indexed examId, bytes32 merkleRoot);
@@ -141,6 +152,7 @@ contract ExamVault is AccessControl {
     );
     event ExamConcluded(uint256 indexed examId);
     event ExamCancelled(uint256 indexed examId, bytes32 reasonHash);
+    event ReleaseAttestorsSet(address[3] attestors);
 
     // --- Immutables & Storage ---
     uint64 public immutable minLeadSeconds;
@@ -191,6 +203,10 @@ contract ExamVault is AccessControl {
     /// @dev Candidate roster Merkle root per exam (published once)
     mapping(uint256 => bytes32) internal _rosterRoots;
 
+    address[3] private _releaseAttestors;
+    mapping(address => bool) public isReleaseAttestor;
+    mapping(bytes32 => bool) internal _usedReleaseNonces;
+
     /**
      * @notice Deploy the ExamVault contract.
      * @param _minLeadSeconds Minimum lead time required between creation and releaseOpensAt (e.g. 60s for tests/demo, 3600s for prod).
@@ -201,21 +217,222 @@ contract ExamVault is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+    function setReleaseAttestors(address[3] calldata attestors) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < 3; i++) {
+            if (_releaseAttestors[i] != address(0)) {
+                isReleaseAttestor[_releaseAttestors[i]] = false;
+            }
+        }
+
+        for (uint256 i = 0; i < 3; i++) {
+            if (attestors[i] == address(0)) revert ZeroValue();
+            for (uint256 j = i + 1; j < 3; j++) {
+                if (attestors[i] == attestors[j]) revert DuplicateEntry();
+            }
+            isReleaseAttestor[attestors[i]] = true;
+            _releaseAttestors[i] = attestors[i];
+        }
+        emit ReleaseAttestorsSet(attestors);
+    }
+
+    function releaseAttestors() external view returns (address[3] memory) {
+        return _releaseAttestors;
+    }
+
+    function _domainSeparator() internal view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256("SIGIL"),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
+    function _hashReleaseAttestation(
+        uint256 examId,
+        uint256 chainId,
+        address contractAddress,
+        bytes32 holderSetHash,
+        uint8 threshold,
+        bytes32 commitmentSetHash,
+        bytes32 attestorSetHash,
+        uint64 releaseValidFrom,
+        uint64 deadline,
+        bytes32 nonce,
+        bytes32 seed
+    ) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                RELEASE_ATTESTATION_TYPEHASH,
+                examId,
+                chainId,
+                contractAddress,
+                holderSetHash,
+                threshold,
+                commitmentSetHash,
+                attestorSetHash,
+                releaseValidFrom,
+                deadline,
+                nonce,
+                seed
+            )
+        );
+    }
+
+    function _computeHolderSetHash(address[] storage holders) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(holders));
+    }
+
+    function _computeCommitmentSetHash(bytes32[] memory commitments) internal pure returns (bytes32) {
+        return keccak256(abi.encode(commitments));
+    }
+
+    /// @dev Hash the first `threshold` submitted holders' randomness commitments in panel order.
+    function _computeSubmittedCommitmentSetHash(
+        uint256 examId,
+        address[] storage holders,
+        uint8 threshold
+    ) internal view returns (bytes32) {
+        bytes32[] memory commitments = new bytes32[](threshold);
+        uint256 count = 0;
+        for (uint256 i = 0; i < holders.length && count < threshold; i++) {
+            address holder = holders[i];
+            if (_hasSubmittedShare[examId][holder]) {
+                commitments[count] = _randomnessCommitments[examId][holder];
+                count++;
+            }
+        }
+        if (count != threshold) revert InvalidAttestation();
+        return _computeCommitmentSetHash(commitments);
+    }
+
+    function _computeReleaseSeed(uint256 examId, bytes32[] memory reveals) internal pure returns (bytes32) {
+        return keccak256(abi.encode(examId, reveals));
+    }
+
+    function _verifyReleaseAttestation(
+        uint256 examId,
+        bytes32 holderSetHash,
+        uint8 threshold,
+        bytes32 commitmentSetHash,
+        bytes32 attestorSetHash,
+        uint64 releaseValidFrom,
+        uint64 deadline,
+        bytes32 nonce,
+        bytes32 seed,
+        bytes memory signatureA,
+        bytes memory signatureB
+    ) internal returns (bool) {
+        if (deadline == 0 || deadline <= block.timestamp) revert ExpiredAttestation(deadline);
+        if (releaseValidFrom == 0 || releaseValidFrom > deadline) revert InvalidAttestation();
+        if (threshold == 0 || threshold > 20) revert InvalidAttestation();
+        if (signatureA.length != 65 || signatureB.length != 65) revert InvalidAttestation();
+
+        address[] storage holders = _examHolders[examId];
+        if (holders.length == 0 || holderSetHash != keccak256(abi.encodePacked(holders))) revert InvalidAttestation();
+
+        if (commitmentSetHash != _computeSubmittedCommitmentSetHash(examId, holders, threshold)) {
+            revert InvalidAttestation();
+        }
+
+        address[3] memory configuredAttestors = _releaseAttestors;
+        if (attestorSetHash != keccak256(abi.encodePacked(configuredAttestors))) revert InvalidAttestation();
+        if (holderSetHash == bytes32(0) || commitmentSetHash == bytes32(0) || attestorSetHash == bytes32(0)) revert InvalidAttestation();
+
+        bytes32 digest = MessageHashUtils.toTypedDataHash(
+            _domainSeparator(),
+            _hashReleaseAttestation(
+                examId,
+                block.chainid,
+                address(this),
+                holderSetHash,
+                threshold,
+                commitmentSetHash,
+                attestorSetHash,
+                releaseValidFrom,
+                deadline,
+                nonce,
+                seed
+            )
+        );
+
+        address signerA = ECDSA.recover(digest, signatureA);
+        address signerB = ECDSA.recover(digest, signatureB);
+
+        if (signerA == address(0) || signerB == address(0)) revert InvalidAttestation();
+        if (signerA == signerB) revert InvalidAttestation();
+        if (!isReleaseAttestor[signerA] || !isReleaseAttestor[signerB]) revert AttestorNotAuthorized(signerA);
+
+        bool foundA = false;
+        bool foundB = false;
+        for (uint256 i = 0; i < 3; i++) {
+            if (_releaseAttestors[i] == signerA) {
+                foundA = true;
+            }
+            if (_releaseAttestors[i] == signerB) {
+                foundB = true;
+            }
+        }
+        if (!foundA || !foundB) revert AttestorNotAuthorized(signerA);
+        if (_usedReleaseNonces[nonce]) revert InvalidAttestation();
+
+        _usedReleaseNonces[nonce] = true;
+        return true;
+    }
+
+    function _finalizeRelease(
+        uint256 examId,
+        bytes32 releaseSeed,
+        bytes32 holderSetHash,
+        bytes32 commitmentSetHash,
+        bytes32 attestorSetHash,
+        uint64 releaseValidFrom,
+        uint64 deadline,
+        bytes32 nonce,
+        bytes memory signatureA,
+        bytes memory signatureB
+    ) internal {
+        Exam storage exam = _exams[examId];
+        _verifyReleaseAttestation(
+            examId,
+            holderSetHash,
+            exam.threshold,
+            commitmentSetHash,
+            attestorSetHash,
+            releaseValidFrom,
+            deadline,
+            nonce,
+            releaseSeed,
+            signatureA,
+            signatureB
+        );
+
+        exam.releasedAt = uint64(block.timestamp);
+        exam.state = State.Released;
+
+        address[] storage holders = _examHolders[examId];
+        for (uint256 i = 0; i < holders.length; i++) {
+            liveExamCount[holders[i]] -= 1;
+        }
+
+        emit PaperReleased(examId, exam.releasedAt);
+    }
+
     // --- Participant Registry (SC-02) ---
 
     /**
-     * @notice Register a participant with an assigned role and optional profile hash.
-     * @dev Only DEFAULT_ADMIN_ROLE can register participants.
-     * @param account Ethereum address of the participant.
-     * @param role Numeric role identifier (1=AUTHORITY, 2=SETTER, 3=HOLDER, 4=CENTRE, 5=AUDITOR).
-     * @param profileHash Keccak-256 hash of participant profile metadata (or bytes32(0)).
+     * @notice Register a participant with a role.
+     * @dev Only admin can add participants. Duplicate roles and zero address are rejected.
+     * @param account Address of the participant.
+     * @param role Role identifier (1 = AUTHORITY, 2 = SETTER, 3 = HOLDER, 4 = CENTRE, 5 = AUDITOR).
+     * @param profileHash Hash of the participant profile or identifier.
      */
-    function registerParticipant(
-        address account,
-        uint8 role,
-        bytes32 profileHash
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerParticipant(address account, uint8 role, bytes32 profileHash) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (account == address(0)) revert ZeroValue();
+
         bytes32 roleBytes = _roleFromId(role);
         if (hasRole(roleBytes, account)) revert DuplicateEntry();
 
@@ -518,40 +735,62 @@ contract ExamVault is AccessControl {
     // --- Threshold Release (SC-06) ---
 
     /**
-     * @notice Submit key share and randomness reveal during the release window.
-     * @dev Verifies share and reveal commitments. When threshold t submissions are reached, computes canonical seed and transitions state to Released. Plaintext shares are never stored in contract storage. Decrements liveExamCount for all assigned holders.
+     * @notice Submit a holder's commitment-based share and reveal during the release window.
+     * @dev Verifies share and reveal commitments. When threshold t submissions are reached,
+     *      the contract requires an EIP-712 release attestation from two independent authorized attestors
+     *      before transitioning to Released. Plaintext shares are never stored or emitted on chain.
      * @param examId ID of the exam.
-     * @param share Key share bytes.
+     * @param shareCommitment Keccak-256 commitment of the holder's plaintext share.
      * @param reveal Randomness reveal bytes32.
      */
     function submitShare(
         uint256 examId,
-        bytes calldata share,
+        bytes32 shareCommitment,
         bytes32 reveal
     ) external onlyRole(HOLDER_ROLE) {
+        _submitShare(examId, shareCommitment, reveal, 0, bytes32(0), new bytes(0), new bytes(0), false);
+    }
+
+    function submitShare(
+        uint256 examId,
+        bytes32 shareCommitment,
+        bytes32 reveal,
+        uint64 deadline,
+        bytes32 nonce,
+        bytes calldata signatureA,
+        bytes calldata signatureB
+    ) external onlyRole(HOLDER_ROLE) {
+        _submitShare(examId, shareCommitment, reveal, deadline, nonce, signatureA, signatureB, true);
+    }
+
+    function _submitShare(
+        uint256 examId,
+        bytes32 shareCommitment,
+        bytes32 reveal,
+        uint64 deadline,
+        bytes32 nonce,
+        bytes memory signatureA,
+        bytes memory signatureB,
+        bool attestationRequired
+    ) internal {
         if (examId == 0 || examId >= _nextExamId) revert ExamNotFound();
         if (!isHolder[examId][msg.sender]) revert NotAssigned();
 
         Exam storage exam = _exams[examId];
 
-        // Validate time window
         uint64 nowTime = uint64(block.timestamp);
         if (nowTime < exam.releaseOpensAt) revert TooEarly(nowTime, exam.releaseOpensAt);
         if (nowTime > exam.examEndsAt) revert TooLate(nowTime, exam.examEndsAt);
 
-        // Validate state
         if (exam.state != State.Sealed && exam.state != State.Released) {
             revert WrongState(State.Sealed, exam.state);
         }
 
-        if (share.length == 0 || reveal == bytes32(0)) revert ZeroValue();
+        if (shareCommitment == bytes32(0) || reveal == bytes32(0)) revert ZeroValue();
         if (_hasSubmittedShare[examId][msg.sender]) revert AlreadySubmitted();
 
-        // Verify share commitment
-        bytes32 computedShareCommitment = keccak256(abi.encode(examId, msg.sender, share));
-        if (computedShareCommitment != _shareCommitments[examId][msg.sender]) revert InvalidShare();
+        if (_shareCommitments[examId][msg.sender] != shareCommitment) revert InvalidShare();
 
-        // Verify randomness reveal
         bytes32 computedRandomnessCommitment = keccak256(abi.encode(examId, msg.sender, reveal));
         if (computedRandomnessCommitment != _randomnessCommitments[examId][msg.sender]) revert InvalidReveal();
 
@@ -559,10 +798,18 @@ contract ExamVault is AccessControl {
         _submittedReveals[examId][msg.sender] = reveal;
         _shareSubmissionCount[examId] += 1;
 
-        emit ShareSubmitted(examId, msg.sender, share);
+        emit ShareSubmitted(examId, msg.sender, shareCommitment);
 
-        // Transition to Released state at exactly the threshold t-th submission
         if (exam.state == State.Sealed && _shareSubmissionCount[examId] == exam.threshold) {
+            if (!attestationRequired) {
+                revert InvalidAttestation();
+            }
+
+            if (deadline == 0 || nonce == bytes32(0)) revert InvalidAttestation();
+            if (_releaseAttestors[0] == address(0) || _releaseAttestors[1] == address(0) || _releaseAttestors[2] == address(0)) {
+                revert InvalidAttestation();
+            }
+
             address[] storage holders = _examHolders[examId];
             bytes32[] memory reveals = new bytes32[](exam.threshold);
             uint256 idx = 0;
@@ -575,17 +822,25 @@ contract ExamVault is AccessControl {
                 }
             }
 
-            bytes32 seed = keccak256(abi.encode(examId, reveals));
-            exam.seed = seed;
-            exam.releasedAt = nowTime;
-            exam.state = State.Released;
+            bytes32 holderSetHash = _computeHolderSetHash(holders);
+            bytes32 commitmentSetHash = _computeSubmittedCommitmentSetHash(examId, holders, exam.threshold);
+            bytes32 attestorSetHash = keccak256(abi.encodePacked(_releaseAttestors));
+            bytes32 releaseSeed = _computeReleaseSeed(examId, reveals);
+            uint64 releaseValidFrom = exam.releaseOpensAt;
 
-            // Decrement liveExamCount exactly once per holder when leaving live state
-            for (uint256 i = 0; i < holders.length; i++) {
-                liveExamCount[holders[i]] -= 1;
-            }
-
-            emit PaperReleased(examId, seed, nowTime);
+            _finalizeRelease(
+                examId,
+                releaseSeed,
+                holderSetHash,
+                commitmentSetHash,
+                attestorSetHash,
+                releaseValidFrom,
+                deadline,
+                nonce,
+                signatureA,
+                signatureB
+            );
+            return;
         }
     }
 

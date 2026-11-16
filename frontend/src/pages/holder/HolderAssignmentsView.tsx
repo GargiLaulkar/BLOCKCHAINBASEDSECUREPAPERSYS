@@ -66,7 +66,7 @@ export function HolderAssignmentsView({
         <h1 id="holder-assignments-title">Assigned examinations</h1>
         <p>Exams where this wallet is an assigned holder, with the published section quotas.</p>
       </header>
-      <div className="holder-table-scroll">
+      <div className="holder-table-scroll" role="region" aria-label="Holder examination assignments table" tabIndex={0}>
         <table className="holder-table">
           <thead>
             <tr>

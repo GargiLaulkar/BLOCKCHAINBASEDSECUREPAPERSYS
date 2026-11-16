@@ -219,17 +219,12 @@ export async function handleEvent(
 
     case "PaperReleased": {
       const examId = args.examId.toString();
-      const seed = args.seed;
 
       await tx.exam.updateMany({
         where: { examId, state: { lt: 3 } },
-        data: { state: 3, seed },
+        data: { state: 3 },
       });
 
-      await tx.exam.updateMany({
-        where: { examId },
-        data: { seed },
-      });
       break;
     }
 

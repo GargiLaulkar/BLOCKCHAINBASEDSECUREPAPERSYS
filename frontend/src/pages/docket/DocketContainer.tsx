@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useExamPanel, useExams } from '../../hooks/useExams';
 import type { ExamPanelContract, ExamSummary } from '../../hooks/useExams';
 import { useAuthGuard } from '../../auth/useAuthGuard';
@@ -76,10 +76,11 @@ function ExamPanelLoader({ examId, contract, onLoaded, onError }: ExamPanelLoade
 export const DocketContainer: React.FC = () => {
   const guard = useAuthGuard(['AUTHORITY']);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const contractState = useExamVaultContract();
   const rawContract = contractState.contract;
 
-  const [stateFilter, setStateFilter] = useState<string | 'ALL'>('ALL');
+  const [stateFilter, setStateFilter] = useState<string | 'ALL'>(() => searchParams.get('state') ?? 'ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [examTitles, setExamTitles] = useState<Record<string, string | null>>({});
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -87,6 +88,14 @@ export const DocketContainer: React.FC = () => {
   const [panelCounts, setPanelCounts] = useState<Record<string, number>>({});
   const [panelErrors, setPanelErrors] = useState<Record<string, Error>>({});
   const [panelRetryVersion, setPanelRetryVersion] = useState(0);
+
+  const updateStateFilter = useCallback((next: string | 'ALL') => {
+    setStateFilter(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === 'ALL') params.delete('state');
+    else params.set('state', next.toLowerCase());
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const { exams, isLoading, error, refetch } = useExams({
     enabled: guard.isAuthorized,
@@ -228,7 +237,7 @@ export const DocketContainer: React.FC = () => {
       error={pageError}
       permissionDenied={isPermissionDenied}
       stateFilter={stateFilter}
-      onStateFilterChange={setStateFilter}
+      onStateFilterChange={updateStateFilter}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       onCreateExam={() => navigate('/authority/create')}

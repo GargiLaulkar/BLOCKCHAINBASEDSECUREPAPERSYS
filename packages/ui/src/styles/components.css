@@ -316,6 +316,16 @@
   padding: var(--sigil-space-8) var(--sigil-space-4);
 }
 
+.sigil-loading-state, .sigil-error-state, .sigil-success-message { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--sigil-color-hairline); border-radius: 3px; }
+.sigil-loading-state { display: flex; align-items: center; gap: 10px; color: var(--sigil-color-slate); background: var(--sigil-color-sheet); }
+.sigil-loading-state__indicator { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: sigil-state-spin .8s linear infinite; }
+.sigil-error-state { color: #702a2a; border-left: 3px solid #a33; background: #f8eded; }
+.sigil-error-state__title { margin: 0 0 6px; font-size: 1rem; }
+.sigil-error-state p { margin: 0 0 12px; }
+.sigil-success-message { color: #245d3d; border-left: 3px solid #39764e; background: #edf6ef; overflow-wrap: anywhere; }
+@keyframes sigil-state-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sigil-loading-state__indicator { animation: none; border-right-color: currentColor; } }
+
 .sigil-empty-state__title {
   font-size: var(--sigil-font-size-lg);
   font-weight: 600;
