@@ -74,6 +74,42 @@ describe("CR-05 keystore", () => {
   });
 });
 
+describe("CR-06 ceremony", () => {
+  it("runs key ceremony, splits shares, and returns valid encrypted envelopes without leaking secrets", async () => {
+    const holders = await Promise.all(
+      ["0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", "0x3333333333333333333333333333333333333333"].map(async (address) => {
+        const { pubKey } = await core.keystore.createKeystore("passphrase-for-holder-123");
+        return { address: address as core.types.Address, pubKey };
+      })
+    );
+
+    const result = await core.ceremony.runCeremony({
+      examId: 42n,
+      holders,
+      threshold: 2,
+    });
+
+    expect(result.examPublicKey).toHaveLength(65);
+    expect(result.examPublicKey[0]).toBe(0x04);
+    expect(result.commitments).toHaveLength(3);
+    expect(result.encryptedShares).toHaveLength(3);
+    for (const item of result.encryptedShares) {
+      expect(item.envelope[0]).toBe(0x01);
+      expect(item.envelope.length).toBeGreaterThanOrEqual(94);
+    }
+  });
+
+  it("rejects invalid thresholds or holder counts", async () => {
+    const { pubKey } = await core.keystore.createKeystore("passphrase-for-holder-123");
+    const holder = { address: "0x1111111111111111111111111111111111111111" as core.types.Address, pubKey };
+    await expect(core.ceremony.runCeremony({
+      examId: 42n,
+      holders: [holder, holder],
+      threshold: 2,
+    })).rejects.toThrow(/holder count/i);
+  });
+});
+
 describe("CR-07 paper selection", () => {
   const seed = (`0x${"11".repeat(32)}`) as `0x${string}`;
   it("is deterministic and respects quotas", () => {

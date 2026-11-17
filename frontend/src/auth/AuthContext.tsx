@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchChainHealth, isGalleryRoute]);
 
   // Check active SIWE session with backend
-  const checkCurrentSession = useCallback(async () => {
+  const checkCurrentSession = useCallback(async (activeAccount?: string | null) => {
     if (isGalleryRoute) {
       setIsAuthenticated(false);
       setRoles([]);
@@ -85,6 +85,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (res.ok) {
         const data = await res.json();
+        const currentAddr = activeAccount !== undefined ? activeAccount : account;
+        if (currentAddr && data.address && data.address.toLowerCase() !== currentAddr.toLowerCase()) {
+          // Account switch detected: session belongs to a different wallet. Invalidate local and backend session.
+          setIsAuthenticated(false);
+          setRoles([]);
+          void fetch(`${apiOrigin}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+          }).catch(() => {});
+          return;
+        }
         setIsAuthenticated(true);
         if (data.roles && Array.isArray(data.roles)) {
           setRoles(data.roles as SystemRole[]);
@@ -117,16 +128,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts && accounts.length > 0) {
         try {
-          setAccount(ethers.getAddress(accounts[0]));
+          const nextAccount = ethers.getAddress(accounts[0]);
+          setAccount(nextAccount);
+          void checkCurrentSession(nextAccount);
         } catch {
           setError('Invalid wallet address.');
           return;
         }
-        void checkCurrentSession();
       } else {
         setAccount(null);
         setIsAuthenticated(false);
         setRoles([]);
+        void fetch(`${apiOrigin}/api/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        }).catch(() => {});
       }
     };
 
@@ -138,7 +154,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then((accs: string[]) => {
         if (accs && accs.length > 0) {
           try {
-            setAccount(ethers.getAddress(accs[0]));
+            const initialAcc = ethers.getAddress(accs[0]);
+            setAccount(initialAcc);
+            void checkCurrentSession(initialAcc);
           } catch {
             setError('Invalid wallet address.');
           }

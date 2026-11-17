@@ -77,6 +77,10 @@ export function KeyCeremonyContainer() {
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const activeTransactionHash = useRef<string | null>(null);
 
+  useEffect(() => () => {
+    setPrepared(null);
+  }, []);
+
   const panelContract = useMemo<ExamPanelContract | null>(() => {
     if (!rawContract) {
       return null;

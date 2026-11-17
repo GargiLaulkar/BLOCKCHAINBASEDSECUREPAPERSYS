@@ -37,16 +37,30 @@ export async function runCeremony(input: CeremonyInput): Promise<CeremonyResult>
     const bin = atob(s + "=".repeat((4 - (s.length % 4)) % 4));
     return Uint8Array.from(bin, (c) => c.charCodeAt(0));
   })();
-  const shares = await split(d, n, input.threshold);
-  const commitments: Hex[] = [];
-  const encryptedShares: Array<{ holder: Address; envelope: Uint8Array }> = [];
-  for (let i = 0; i < input.holders.length; i++) {
-    const holder = input.holders[i]!;
-    const share = shares[i]!;
-    commitments.push(shareCommitment(input.examId, holder.address, share));
-    const envelope = await encryptToPublicKey(holder.pubKey, share, aadFor(input.examId, "share", holder.address.toLowerCase()));
-    encryptedShares.push({ holder: holder.address, envelope });
+  let shares: Uint8Array[] | null = null;
+  try {
+    shares = await split(d, n, input.threshold);
+    const commitments: Hex[] = [];
+    const encryptedShares: Array<{ holder: Address; envelope: Uint8Array }> = [];
+    for (let i = 0; i < input.holders.length; i++) {
+      const holder = input.holders[i]!;
+      const share = shares[i]!;
+      commitments.push(shareCommitment(input.examId, holder.address, share));
+      const envelope = await encryptToPublicKey(holder.pubKey, share, aadFor(input.examId, "share", holder.address.toLowerCase()));
+      encryptedShares.push({ holder: holder.address, envelope });
+    }
+    // `d` and the private JWK are intentionally zeroed/cleared and are not returned or logged.
+    return { examPublicKey: publicKey, commitments, encryptedShares };
+  } finally {
+    d.fill(0);
+    if (shares) {
+      for (const share of shares) {
+        share.fill(0);
+      }
+    }
+    if (privateJwk.d) {
+      privateJwk.d = "";
+    }
+    delete (privateJwk as Record<string, unknown>).d;
   }
-  // `d` and the private JWK are intentionally local variables and are not returned or logged.
-  return { examPublicKey: publicKey, commitments, encryptedShares };
 }
